@@ -71,7 +71,7 @@ function cloneExams(value) {
 
 function bestFromExams(exams) {
   const passedTimes = exams
-    .filter((exam) => exam.passed === true && validSeconds(exam.seconds))
+    .filter((exam) => exam.passed === true && exam.score === 3 && validSeconds(exam.seconds))
     .map((exam) => exam.seconds);
   return passedTimes.length > 0 ? Math.min(...passedTimes) : null;
 }
@@ -87,11 +87,7 @@ function normalizeProgress(value) {
   normalized.current = cloneCurrent(value.current);
   normalized.exams = cloneExams(value.exams);
 
-  const storedBest = validSeconds(value.bestExamSeconds) ? value.bestExamSeconds : null;
-  const examBest = bestFromExams(normalized.exams);
-  normalized.bestExamSeconds = storedBest === null
-    ? examBest
-    : examBest === null ? storedBest : Math.min(storedBest, examBest);
+  normalized.bestExamSeconds = bestFromExams(normalized.exams);
   return normalized;
 }
 
@@ -149,9 +145,13 @@ export function completeWorkshop(progress, workshopId, result) {
 export function recordExam(progress, result) {
   const next = snapshot(progress);
   const exam = isRecord(result) ? cloneValue(result) : {};
+  if (typeof exam.id === 'string' && exam.id.length > 0
+    && next.exams.some((existing) => existing.id === exam.id)) {
+    return next;
+  }
   next.exams = [...next.exams, exam];
 
-  if (exam.passed === true && validSeconds(exam.seconds)) {
+  if (exam.passed === true && exam.score === 3 && validSeconds(exam.seconds)) {
     next.bestExamSeconds = next.bestExamSeconds === null
       ? exam.seconds
       : Math.min(next.bestExamSeconds, exam.seconds);

@@ -65,6 +65,30 @@ describe('progress storage', () => {
     expect(failedExam.exams).toHaveLength(2);
   });
 
+  it('records a finalized exam id once and updates best time only for a full pass', () => {
+    const initial = loadProgress(memoryStorage());
+    const expired = recordExam(initial, { id: 'exam:reload', passed: false, seconds: 900, score: 2 });
+    const duplicate = recordExam(expired, { id: 'exam:reload', passed: true, seconds: 100, score: 3 });
+    const partial = recordExam(duplicate, { id: 'exam:partial', passed: false, seconds: 200, score: 2 });
+    const inconsistent = recordExam(partial, { id: 'exam:inconsistent', passed: true, seconds: 100, score: 2 });
+    const passed = recordExam(inconsistent, { id: 'exam:passed', passed: true, seconds: 640, score: 3 });
+
+    expect(duplicate.exams).toEqual(expired.exams);
+    expect(partial.bestExamSeconds).toBeNull();
+    expect(inconsistent.bestExamSeconds).toBeNull();
+    expect(passed.bestExamSeconds).toBe(640);
+    expect(passed.exams).toHaveLength(4);
+
+    const inconsistentStored = loadProgress(memoryStorage(JSON.stringify({
+      version: 1,
+      locale: 'fr',
+      completed: {},
+      exams: [{ id: 'exam:bad-best', passed: true, seconds: 100, score: 2 }],
+      bestExamSeconds: 100,
+    })));
+    expect(inconsistentStored.bestExamSeconds).toBeNull();
+  });
+
   it('detaches nested progress data from caller-owned objects', () => {
     const nested = { attempts: 1, metadata: { tags: ['range'] } };
     const source = {

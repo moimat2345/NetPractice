@@ -369,6 +369,197 @@
   padding: clamp(2.5rem, 5vw, 5rem) clamp(1.1rem, 5vw, 4.5rem) 5rem;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  margin: -1px;
+  white-space: nowrap;
+}
+
+.exam-view {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 5vw, 5rem) clamp(1.1rem, 5vw, 4.5rem) 5rem;
+}
+
+.exam-header {
+  display: flex;
+  padding-bottom: clamp(1.5rem, 3vw, 2.4rem);
+  align-items: end;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule-strong);
+  gap: 2rem;
+}
+
+.exam-header h1 {
+  margin-bottom: 0.5rem;
+  font-size: clamp(2.5rem, 5vw, 4.6rem);
+}
+
+.exam-header p:last-child {
+  margin-bottom: 0;
+  color: var(--muted-ink);
+}
+
+.exam-timer {
+  display: grid;
+  min-width: 150px;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--accent);
+  background: #fff8f1;
+  box-shadow: 4px 4px 0 var(--accent-soft);
+  gap: 0.2rem;
+  text-align: right;
+}
+
+.exam-timer span {
+  color: var(--accent-dark);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.exam-timer-value {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.exam-mission-nav {
+  display: grid;
+  margin-top: 1.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.exam-mission-tab {
+  display: flex;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0.7rem 0.85rem;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--rule-strong);
+  background: var(--sheet);
+  color: var(--ink);
+  cursor: pointer;
+  gap: 0.5rem;
+}
+
+.exam-mission-tab[aria-current="step"] {
+  border: 2px solid var(--accent);
+  background: #fff8f1;
+}
+
+.exam-mission-tab:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.exam-mission-tab span {
+  font-weight: 800;
+}
+
+.exam-mission-tab small {
+  color: var(--muted-ink);
+}
+
+.exam-form {
+  margin-top: 1rem;
+}
+
+.exam-results {
+  margin-top: clamp(2rem, 4vw, 3rem);
+}
+
+.exam-results h2 {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+}
+
+.exam-result-overview {
+  display: flex;
+  margin-bottom: 1.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule-strong);
+  gap: 1rem;
+}
+
+.exam-result-overview strong {
+  color: var(--accent-dark);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 1.4rem;
+}
+
+.exam-result-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.exam-result-card {
+  min-width: 0;
+  padding: 1.1rem;
+  border: 1px solid var(--accent);
+  background: #fff8f1;
+}
+
+.exam-result-card.is-passed {
+  border-color: var(--network-link);
+  background: var(--network-soft);
+}
+
+.exam-result-card header {
+  display: flex;
+  padding-bottom: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule);
+  gap: 0.5rem;
+}
+
+.exam-mission-number {
+  color: var(--muted-ink);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.exam-diagnostics {
+  display: grid;
+  margin: 0.9rem 0;
+  padding-left: 1.1rem;
+  color: var(--muted-ink);
+  gap: 0.45rem;
+}
+
+.exam-remediation {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+.exam-remediation span {
+  color: var(--muted-ink);
+}
+
+.exam-remediation a {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.exam-saved-note {
+  margin-top: 1.5rem;
+  color: var(--muted-ink);
+}
+
 .workshop-lesson {
   display: grid;
   padding-bottom: clamp(2rem, 4vw, 3.5rem);
@@ -799,6 +990,20 @@
 }
 
 @media (max-width: 720px) {
+  .exam-header,
+  .exam-result-overview {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .exam-timer {
+    text-align: left;
+  }
+
+  .exam-result-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .workshop-lesson {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -822,6 +1027,10 @@
 }
 
 @media (max-width: 599px) {
+  .exam-mission-nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .topology-canvas {
     min-height: 0;
     padding: 0.75rem;
