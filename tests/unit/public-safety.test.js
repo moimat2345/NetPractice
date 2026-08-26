@@ -19,6 +19,7 @@ import {
   assertExecutableReferencesSafe,
   assertPublicPathsSafe,
   listFilesRecursively,
+  runPublicSafetyCheck,
 } from '../../scripts/public-safety.mjs';
 
 const temporaryDirectories = [];
@@ -597,5 +598,58 @@ describe('assertPublicPathsSafe', () => {
       'assets/app.js',
       'index.html',
     ]);
+  });
+
+  it('aborts the production pipeline on a restored root discovery substitution', () => {
+    const fixture = fixtureDirectory();
+    const repositoryRoot = join(fixture, 'repository');
+    const distRoot = join(repositoryRoot, 'dist');
+    mkdirSync(distRoot, { recursive: true });
+    writeFileSync(
+      join(distRoot, 'index.html'),
+      '<script src="/net_practice/js/level10.js"></script>',
+    );
+
+    const message = errorMessage(() => runPublicSafetyCheck({
+      discoveryOperations: {
+        readdirSync(path) {
+          return replacementEnumeration(path, repositoryRoot, true);
+        },
+      },
+      rootPath: repositoryRoot,
+      trackedPaths: [],
+    }));
+
+    expect(message).toMatch(/dist/);
+    expect(message).not.toContain('net_practice');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('aborts the production pipeline on a restored nested discovery substitution', () => {
+    const fixture = fixtureDirectory();
+    const repositoryRoot = join(fixture, 'repository');
+    const distRoot = join(repositoryRoot, 'dist');
+    const nested = join(distRoot, 'assets');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(
+      join(nested, 'app.js'),
+      'im' + 'port("/net_practice/js/level10.js");',
+    );
+
+    const message = errorMessage(() => runPublicSafetyCheck({
+      discoveryOperations: {
+        readdirSync(path) {
+          return path === nested
+            ? replacementEnumeration(path, repositoryRoot, true)
+            : readdirSync(path);
+        },
+      },
+      rootPath: repositoryRoot,
+      trackedPaths: [],
+    }));
+
+    expect(message).toMatch(/assets/);
+    expect(message).not.toContain('net_practice');
+    expect(message).not.toContain(fixture);
   });
 });

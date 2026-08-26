@@ -431,23 +431,37 @@ export function assertEmittedTextSafe(files, operations = {}) {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const root = process.cwd();
-  const tracked = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
-    .split('\n')
-    .filter(Boolean);
+export function runPublicSafetyCheck({
+  discoveryOperations = {},
+  rootPath = process.cwd(),
+  trackedPaths,
+} = {}) {
+  const root = resolve(rootPath);
+  const tracked = trackedPaths ?? execFileSync('git', ['ls-files'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).split('\n').filter(Boolean);
   assertPublicPathsSafe(tracked);
   const trackedFiles = tracked
     .map((path) => ({ absolutePath: resolve(root, path), relativePath: path, rootPath: root }));
   assertExecutableReferencesSafe(trackedFiles);
 
-  const emittedFiles = listFilesRecursively(resolve(root, 'dist'));
+  const emittedFiles = listFilesRecursively(resolve(root, 'dist'), discoveryOperations);
   assertPublicPathsSafe(emittedFiles.map((file) => `dist/${file.relativePath}`));
   assertExecutableReferencesSafe(emittedFiles);
   assertEmittedTextSafe(emittedFiles);
 
-  const emittedSummary = emittedFiles.length > 0
-    ? ` ${emittedFiles.length} emitted files checked.`
+  return {
+    emittedFileCount: emittedFiles.length,
+    trackedFileCount: tracked.length,
+  };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const result = runPublicSafetyCheck();
+
+  const emittedSummary = result.emittedFileCount > 0
+    ? ` ${result.emittedFileCount} emitted files checked.`
     : ' No dist directory present; emitted-file checks will run after build.';
-  console.log(`Public tree safe: ${tracked.length} tracked files checked.${emittedSummary}`);
+  console.log(`Public tree safe: ${result.trackedFileCount} tracked files checked.${emittedSummary}`);
 }
