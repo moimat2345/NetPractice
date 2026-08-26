@@ -150,6 +150,46 @@ describe('assertPublicPathsSafe', () => {
       'url.js',
       'new ' + 'URL("/%256eet_practice/js/level10.js", import.meta.url);',
     ],
+    [
+      'single-encoded question delimiter inside the path',
+      'encoded-question.html',
+      '<script src="/assets/%3F/net_practice/js/level10.js"></script>',
+    ],
+    [
+      'double-encoded question delimiter inside the path',
+      'double-question.html',
+      '<script src="/assets/%253F/net_practice/js/level10.js"></script>',
+    ],
+    [
+      'single-encoded fragment delimiter inside the path',
+      'encoded-fragment.html',
+      '<script src="/assets/%23/net_practice/js/level10.js"></script>',
+    ],
+    [
+      'double-encoded fragment delimiter inside the path',
+      'double-fragment.html',
+      '<script src="/assets/%2523/net_practice/js/level10.js"></script>',
+    ],
+    [
+      'constant template dynamic import',
+      'template-import.js',
+      'im' + 'port(`/\\x6eet_practice/js/level10.js`);',
+    ],
+    [
+      'constant template new URL reference',
+      'template-url.js',
+      'new ' + 'URL(`/%256eet_practice/js/level10.js`, import.meta.url);',
+    ],
+    [
+      'escaped CSS url identifier',
+      'escaped-url.css',
+      '.lesson { background: u\\72l("/net_practice/art.png"); }',
+    ],
+    [
+      'escaped CSS import identifier with casing and whitespace',
+      'escaped-import.css',
+      '@\\69mport  U\\000052 L( "/net_practice/theme.css" );',
+    ],
   ])('rejects %s and reports only its file name', (_case, fileName, content) => {
     const root = fixtureDirectory();
     writeFileSync(join(root, fileName), content);
@@ -174,6 +214,16 @@ describe('assertPublicPathsSafe', () => {
     ].join('\n'));
     writeFileSync(join(root, 'theme.css'), '@import url("/assets/theme.css");');
     writeFileSync(join(root, 'app.js'), 'im' + 'port("/assets/module.js");');
+    writeFileSync(join(root, 'escaped-clean.css'), [
+      '.icon { background: u\\72l("/assets/icon.svg"); }',
+      '@\\69mport "/assets/layout.css";',
+    ].join('\n'));
+    writeFileSync(join(root, 'templates.js'), [
+      'im' + 'port(`/assets/module.js`);',
+      'new ' + 'URL(`/assets/icon.svg`, import.meta.url);',
+      'im' + 'port(`/assets/${theme}.js`);',
+      'new ' + 'URL(`/assets/${name}.svg`, import.meta.url);',
+    ].join('\n'));
 
     expect(() => assertExecutableReferencesSafe(listFilesRecursively(root))).not.toThrow();
   });

@@ -91,6 +91,15 @@ function firstDefined(values) {
   return values.find((value) => value !== undefined) ?? '';
 }
 
+function hasTemplateInterpolation(value) {
+  for (let index = value.indexOf('${'); index !== -1; index = value.indexOf('${', index + 2)) {
+    let backslashes = 0;
+    for (let cursor = index - 1; cursor >= 0 && value[cursor] === '\\'; cursor -= 1) backslashes += 1;
+    if (backslashes % 2 === 0) return true;
+  }
+  return false;
+}
+
 function executableReferences(text, extension) {
   const references = [];
   if (['.html', '.svg', '.xml'].includes(extension)) {
@@ -103,12 +112,13 @@ function executableReferences(text, extension) {
     }
   }
   if (extension === '.css') {
+    const decodedSyntax = decodeCssEscapes(text);
     const patterns = [
       /@import\s+(?:url\(\s*)?(?:"((?:\\[\s\S]|[^"])*)"|'((?:\\[\s\S]|[^'])*)'|([^"')\s;]+))/gi,
       /url\(\s*(?:"((?:\\[\s\S]|[^"])*)"|'((?:\\[\s\S]|[^'])*)'|([^"')\s]+))\s*\)/gi,
     ];
     patterns.forEach((pattern) => {
-      for (const match of text.matchAll(pattern)) {
+      for (const match of decodedSyntax.matchAll(pattern)) {
         references.push({ syntax: 'css', value: firstDefined(match.slice(1)) });
       }
     });
@@ -122,6 +132,17 @@ function executableReferences(text, extension) {
     patterns.forEach((pattern) => {
       for (const match of text.matchAll(pattern)) references.push({ syntax: 'javascript', value: match[1] });
     });
+    const templatePatterns = [
+      /\bimport\s*\(\s*`((?:\\.|[^`])*)`\s*\)/g,
+      /\bnew\s+URL\s*\(\s*`((?:\\.|[^`])*)`\s*,\s*import\.meta\.url\s*\)/g,
+    ];
+    templatePatterns.forEach((pattern) => {
+      for (const match of text.matchAll(pattern)) {
+        if (!hasTemplateInterpolation(match[1])) {
+          references.push({ syntax: 'javascript', value: match[1] });
+        }
+      }
+    });
   }
 
   return references;
@@ -132,10 +153,11 @@ function normalizedReference(reference) {
   if (reference.syntax === 'html') normalized = decodeHtmlCharacterReferences(normalized);
   if (reference.syntax === 'css') normalized = decodeCssEscapes(normalized);
   if (reference.syntax === 'javascript') normalized = decodeJavaScriptEscapes(normalized);
-  normalized = decodePercentEscapes(normalized)
+  const rawPath = normalized.split(/[?#]/, 1)[0];
+  normalized = decodePercentEscapes(rawPath)
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .replaceAll('\\', '/');
-  return normalized.split(/[?#]/, 1)[0];
+  return normalized;
 }
 
 function isForbiddenReference(reference) {
