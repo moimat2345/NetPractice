@@ -111,7 +111,7 @@ function normalizeProgress(value) {
   return normalized;
 }
 
-function browserStorage() {
+export function getBrowserStorage() {
   try {
     return typeof globalThis !== 'undefined' && globalThis.localStorage
       ? globalThis.localStorage
@@ -121,8 +121,8 @@ function browserStorage() {
   }
 }
 
-export function loadProgress(storage = browserStorage()) {
-  const target = storage ?? browserStorage();
+export function loadProgress(storage = getBrowserStorage()) {
+  const target = storage ?? getBrowserStorage();
   if (!target || typeof target.getItem !== 'function') return defaults();
 
   try {
@@ -135,7 +135,7 @@ export function loadProgress(storage = browserStorage()) {
 }
 
 export function saveProgress(storage, progress) {
-  const target = storage ?? browserStorage();
+  const target = storage ?? getBrowserStorage();
   if (!target || typeof target.setItem !== 'function') return;
 
   try {

@@ -6,6 +6,10 @@ function diagnostic(code, { deviceId = null, field = null, params = {} } = {}) {
   return { code, messageKey: `diagnostic.${code}`, deviceId, field, params };
 }
 
+function semanticParam(group, value) {
+  return { messageKey: `semantic.${group}.${value}` };
+}
+
 function hostAddressCode(address, prefix) {
   if (!Number.isInteger(address) || address < 0 || address > 0xffffffff) return 'invalid-ip';
   if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) return 'invalid-mask';
@@ -118,7 +122,7 @@ function validateCalculatedAnswers(exercise, values) {
     if (expected !== null && value !== expected) {
       diagnostics.push(diagnostic('incorrect-calculation', {
         field,
-        params: { role: meta.role },
+        params: { role: semanticParam('role', meta.role) },
       }));
     }
   }
@@ -137,7 +141,7 @@ function validateExactAnswers(exercise, values) {
       diagnostics.push(diagnostic(meta.exactDiagnostic ?? 'incorrect-calculation', {
         deviceId: meta.deviceId ?? null,
         field,
-        params: { role: meta.role },
+        params: { role: semanticParam('role', meta.role) },
       }));
     }
   }
@@ -394,14 +398,14 @@ function diagnosticsFromTraces(traces) {
       diagnostics.push(diagnostic('unreachable-destination', {
         deviceId: trace.forward?.deviceId ?? null,
         field: null,
-        params: { reason: trace.forward?.reason ?? 'missing-route' },
+        params: { reason: semanticParam('traceReason', trace.forward?.reason ?? 'missing-route') },
       }));
     }
     if (trace.failedDirection === 'return') {
       diagnostics.push(diagnostic('missing-return-path', {
         deviceId: trace.return?.deviceId ?? null,
         field: null,
-        params: { reason: trace.return?.reason ?? 'missing-route' },
+        params: { reason: semanticParam('traceReason', trace.return?.reason ?? 'missing-route') },
       }));
     }
   }

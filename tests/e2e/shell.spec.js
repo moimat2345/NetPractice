@@ -43,6 +43,7 @@ function storedProgress(locale, completedIds) {
 test('shows the learning path and switches language without reload', async ({ page }, testInfo) => {
   await page.goto('/');
 
+  await expect(page).toHaveTitle('Subnet Notes — Apprendre IPv4 et le routage en pratiquant');
   await expect(page.getByRole('banner')).toContainText('Subnet Notes');
   const navigation = page.locator('nav.curriculum-nav');
   await expect(navigation).toHaveAttribute('aria-label', 'Parcours');
@@ -54,11 +55,28 @@ test('shows the learning path and switches language without reload', async ({ pa
   await page.getByRole('button', { name: 'EN' }).click();
 
   await expect(navigation).toHaveAttribute('aria-label', 'Learning path');
+  await expect(page).toHaveTitle('Subnet Notes — Learn IPv4 and routing by doing');
   if (testInfo.project.name !== 'mobile') await expect(navigation).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('banner')).toHaveAttribute('data-before-language-switch', 'same-shell');
   await expect.poll(async () => page.evaluate(() =>
     JSON.parse(localStorage.getItem('subnet-notes-progress'))?.locale)).toBe('en');
+});
+
+test('renders with in-memory progress when browser storage access is denied', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('Storage access denied', 'SecurityError');
+      },
+    });
+  });
+
+  await page.goto('/');
+
+  await expect(page.getByRole('banner')).toContainText('Subnet Notes');
+  await expect(page.getByRole('main')).toContainText('Construis ton raisonnement');
 });
 
 test('restores saved progress in the shell', async ({ page }) => {

@@ -446,22 +446,35 @@ export function runPublicSafetyCheck({
     .map((path) => ({ absolutePath: resolve(root, path), relativePath: path, rootPath: root }));
   assertExecutableReferencesSafe(trackedFiles);
 
+  const emittedResult = runEmittedSafetyCheck({ discoveryOperations, rootPath: root });
+
+  return {
+    emittedFileCount: emittedResult.emittedFileCount,
+    trackedFileCount: tracked.length,
+  };
+}
+
+export function runEmittedSafetyCheck({ discoveryOperations = {}, rootPath = process.cwd() } = {}) {
+  const root = resolve(rootPath);
   const emittedFiles = listFilesRecursively(resolve(root, 'dist'), discoveryOperations);
   assertPublicPathsSafe(emittedFiles.map((file) => `dist/${file.relativePath}`));
   assertExecutableReferencesSafe(emittedFiles);
   assertEmittedTextSafe(emittedFiles);
 
-  return {
-    emittedFileCount: emittedFiles.length,
-    trackedFileCount: tracked.length,
-  };
+  return { emittedFileCount: emittedFiles.length };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const result = runPublicSafetyCheck();
+  const emittedOnly = process.argv.slice(2).includes('--emitted-only');
+  const result = emittedOnly ? runEmittedSafetyCheck() : runPublicSafetyCheck();
 
-  const emittedSummary = result.emittedFileCount > 0
-    ? ` ${result.emittedFileCount} emitted files checked.`
-    : ' No dist directory present; emitted-file checks will run after build.';
-  console.log(`Public tree safe: ${result.trackedFileCount} tracked files checked.${emittedSummary}`);
+  if (emittedOnly) {
+    const noun = result.emittedFileCount === 1 ? 'file' : 'files';
+    console.log(`Public output safe: ${result.emittedFileCount} emitted ${noun} checked.`);
+  } else {
+    const emittedSummary = result.emittedFileCount > 0
+      ? ` ${result.emittedFileCount} emitted files checked.`
+      : ' No dist directory present; emitted-file checks will run after build.';
+    console.log(`Public tree safe: ${result.trackedFileCount} tracked files checked.${emittedSummary}`);
+  }
 }

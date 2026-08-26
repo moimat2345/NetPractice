@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import {
   closeSync,
   lstatSync,
@@ -13,6 +14,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertEmittedTextSafe,
@@ -94,6 +96,22 @@ afterEach(() => {
 });
 
 describe('assertPublicPathsSafe', () => {
+  it('scans emitted output without requiring Git metadata', () => {
+    const repositoryRoot = fixtureDirectory();
+    const distRoot = join(repositoryRoot, 'dist');
+    mkdirSync(distRoot);
+    writeFileSync(join(distRoot, 'index.html'), '<main>Original networking practice</main>');
+
+    const output = execFileSync(
+      process.execPath,
+      [fileURLToPath(new URL('../../scripts/public-safety.mjs', import.meta.url)), '--emitted-only'],
+      { cwd: repositoryRoot, encoding: 'utf8' },
+    );
+
+    expect(output).toMatch(/1 emitted file checked/i);
+    expect(output).not.toMatch(/tracked file/i);
+  });
+
   it('rejects official and temporary material', () => {
     expect(() => assertPublicPathsSafe([
       'index.html',

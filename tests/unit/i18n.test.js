@@ -73,6 +73,24 @@ describe('i18n', () => {
     expect(i18n.t('diagnostic.invalid-ip', { value: '999.1.1.1' })).toMatch(/invalid/i);
   });
 
+  it('localizes semantic diagnostic and hint parameters instead of exposing implementation tokens', () => {
+    const french = createI18n('fr');
+    const english = createI18n('en');
+
+    expect(french.t('diagnostic.incorrect-calculation', {
+      role: { messageKey: 'semantic.role.network' },
+    })).toContain('adresse réseau');
+    expect(french.t('diagnostic.unreachable-destination', {
+      reason: { messageKey: 'semantic.traceReason.missing-link' },
+    })).toContain('lien physique manquant');
+    expect(french.t('hint.generic.nearSolution', {
+      expectedShape: { messageKey: 'semantic.shape.address' },
+    })).toContain('adresse IP');
+    expect(english.t('diagnostic.unreachable-destination', {
+      reason: { messageKey: 'semantic.traceReason.missing-link' },
+    })).toContain('missing physical link');
+  });
+
   it('keeps missing interpolation placeholders visible and stringifies supplied values safely', () => {
     const i18n = createI18n('en');
 

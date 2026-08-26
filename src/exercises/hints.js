@@ -103,9 +103,11 @@ function exerciseParams(exercise, diagnostic) {
 
 function describeExpectedShape(exercise, field) {
   const meta = exercise.fieldMeta?.[field];
-  if (meta?.kind === 'prefix' || field?.endsWith('.prefix')) return 'CIDR prefix';
-  if (meta?.kind === 'address' || field?.endsWith('.address') || field?.endsWith('.gateway')) return 'IPv4 address';
-  return 'network value';
+  if (meta?.kind === 'prefix' || field?.endsWith('.prefix')) return { messageKey: 'semantic.shape.prefix' };
+  if (meta?.kind === 'address' || field?.endsWith('.address') || field?.endsWith('.gateway')) {
+    return { messageKey: 'semantic.shape.address' };
+  }
+  return { messageKey: 'semantic.shape.network' };
 }
 
 function deriveNearSolutionParams(diagnostic) {

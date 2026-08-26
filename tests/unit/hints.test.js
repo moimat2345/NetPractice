@@ -70,7 +70,7 @@ describe('getHint', () => {
         localAddress: '192.168.12.77',
         network: '192.168.12.64',
         broadcast: '192.168.12.95',
-        expectedShape: 'IPv4 address',
+        expectedShape: { messageKey: 'semantic.shape.address' },
       },
     });
     expect(JSON.stringify(nearSolution)).not.toContain(exercise.solution['a.gateway']);

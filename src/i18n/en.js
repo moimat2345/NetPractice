@@ -1,6 +1,7 @@
 export const en = {
   app: {
     name: 'Subnet Notes',
+    documentTitle: 'Subnet Notes — Learn IPv4 and routing by doing',
     tagline: 'Learn networking by doing',
     nonOfficial: 'Unofficial community resource',
     description: 'Interactive workshops for reasoning about IPv4, subnets, and routing.',
@@ -165,6 +166,34 @@ export const en = {
     broadcast: 'Broadcast address',
     firstHost: 'First host',
     lastHost: 'Last host',
+  },
+  semantic: {
+    role: {
+      'valid-ipv4': 'IPv4 address',
+      'octet-boundary': 'IPv4 address',
+      network: 'network address',
+      broadcast: 'broadcast address',
+      'first-host': 'first host',
+      'last-host': 'last host',
+      host: 'host address',
+      gateway: 'gateway',
+      mask: 'prefix',
+      'direct-network': 'directly connected network',
+      'route-destination': 'route destination',
+      'route-prefix': 'route prefix',
+    },
+    shape: {
+      address: 'IPv4 address',
+      prefix: 'CIDR prefix',
+      network: 'network value',
+    },
+    traceReason: {
+      'missing-route': 'missing route',
+      'unreachable-gateway': 'unreachable gateway',
+      'missing-link': 'missing physical link',
+      'routing-loop': 'routing loop',
+      'hop-limit': 'hop limit reached',
+    },
   },
   action: {
     check: 'Test the network',

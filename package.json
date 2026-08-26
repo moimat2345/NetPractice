@@ -14,6 +14,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check:public": "node scripts/public-safety.mjs",
+    "check:dist": "node scripts/public-safety.mjs --emitted-only",
+    "postbuild": "npm run check:dist",
     "verify": "npm run check:public && npm test && npm run build && npm run test:e2e"
   },
   "keywords": [],

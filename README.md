@@ -55,14 +55,14 @@ npm run build
 npm run test:e2e
 ```
 
-`npm run check:public` checks tracked public paths, executable asset references, and any existing `dist/` output. Unit tests cover networking calculations, generators, validators, translations, persistence, and exam state. Playwright exercises the complete learning path at ultra-wide, desktop, portrait, and mobile viewports.
+`npm run check:public` checks tracked public paths, executable asset references, and any existing `dist/` output. Every `npm run build` also runs `npm run check:dist` after Vite finishes, so the newly emitted deployment files are rejected if they contain excluded official or private material. Unit tests cover networking calculations, generators, validators, translations, persistence, and exam state. Playwright exercises the complete learning path at ultra-wide, desktop, portrait, and mobile viewports.
 
 ## Vercel Deployment
 
 The repository includes [`vercel.json`](./vercel.json) with the build command, static output directory, and baseline security headers. To deploy it:
 
 1. Import the repository into a new Vercel project.
-2. Keep the detected build command as `npm run build`.
+2. Keep the detected build command as `npm run build`; its post-build safety scan is part of the npm lifecycle.
 3. Keep the output directory as `dist`.
 4. deploy without adding environment variables.
 

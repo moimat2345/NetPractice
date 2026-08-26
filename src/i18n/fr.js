@@ -1,6 +1,7 @@
 export const fr = {
   app: {
     name: 'Subnet Notes',
+    documentTitle: 'Subnet Notes — Apprendre IPv4 et le routage en pratiquant',
     tagline: 'Apprendre les réseaux en pratiquant',
     nonOfficial: 'Ressource communautaire non officielle',
     description: 'Des ateliers interactifs pour raisonner sur IPv4, les sous-réseaux et le routage.',
@@ -166,6 +167,34 @@ export const fr = {
     firstHost: 'Premier hôte',
     lastHost: 'Dernier hôte',
   },
+  semantic: {
+    role: {
+      'valid-ipv4': 'adresse IPv4',
+      'octet-boundary': 'adresse IPv4',
+      network: 'adresse réseau',
+      broadcast: 'adresse de diffusion',
+      'first-host': 'premier hôte',
+      'last-host': 'dernier hôte',
+      host: 'adresse de l’hôte',
+      gateway: 'passerelle',
+      mask: 'préfixe',
+      'direct-network': 'réseau directement connecté',
+      'route-destination': 'destination de route',
+      'route-prefix': 'préfixe de route',
+    },
+    shape: {
+      address: 'adresse IPv4',
+      prefix: 'préfixe CIDR',
+      network: 'valeur de réseau',
+    },
+    traceReason: {
+      'missing-route': 'route manquante',
+      'unreachable-gateway': 'passerelle injoignable',
+      'missing-link': 'lien physique manquant',
+      'routing-loop': 'boucle de routage',
+      'hop-limit': 'limite de sauts atteinte',
+    },
+  },
   action: {
     check: 'Tester le réseau',
     hint: 'Voir l’indice {level} sur 3',
@@ -190,7 +219,7 @@ export const fr = {
   diagnostic: {
     'invalid-ip': '« {value} » n’est pas une adresse IPv4 valide.',
     'invalid-mask': '« {value} » n’est pas un masque ou préfixe CIDR valide.',
-    'incorrect-calculation': 'Le calcul de {role} est incorrect. Reprends le préfixe et les bits hôte.',
+    'incorrect-calculation': 'Le calcul du champ « {role} » est incorrect. Reprends le préfixe et les bits hôte.',
     'network-address': '{address}/{prefix} est l’adresse du réseau : elle ne peut pas être attribuée à un hôte.',
     'broadcast-address': '{address}/{prefix} est l’adresse de diffusion : elle ne peut pas être attribuée à un hôte.',
     'different-subnet': 'Cet appareil et {peerDeviceId} ne sont pas dans le même sous-réseau /{prefix}.',

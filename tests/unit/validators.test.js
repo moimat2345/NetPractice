@@ -338,7 +338,10 @@ describe('topology diagnostics', () => {
       .toMatchObject({
         ok: false,
         diagnostics: expect.arrayContaining([
-          expect.objectContaining({ code: 'unreachable-destination', params: { reason: 'missing-link' } }),
+          expect.objectContaining({
+            code: 'unreachable-destination',
+            params: { reason: { messageKey: 'semantic.traceReason.missing-link' } },
+          }),
         ]),
         traces: [{ ok: false, failedDirection: 'forward' }],
       });
