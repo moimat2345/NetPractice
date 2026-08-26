@@ -170,22 +170,103 @@ function validateHostAddresses(topology) {
   return diagnostics;
 }
 
-function validateLinkedSubnets(topology) {
+function buildLayer2Domains(topology) {
   const owners = new Map();
+  const neighbours = new Map();
   for (const device of topology.devices) {
-    for (const entry of device.interfaces) owners.set(entry.id, { device, entry });
+    for (const entry of device.interfaces) {
+      owners.set(entry.id, { device, entry });
+      neighbours.set(entry.id, new Set());
+    }
   }
-  const diagnostics = [];
   for (const link of topology.links) {
-    const left = owners.get(link.a);
-    const right = owners.get(link.b);
-    if (!left || !right || left.entry.address === null || right.entry.address === null) continue;
-    if (!sameSubnet(left.entry.address, right.entry.address, left.entry.prefix)
-      || !sameSubnet(left.entry.address, right.entry.address, right.entry.prefix)) {
+    if (!neighbours.has(link.a) || !neighbours.has(link.b)) continue;
+    neighbours.get(link.a).add(link.b);
+    neighbours.get(link.b).add(link.a);
+  }
+  for (const device of topology.devices) {
+    if (device.kind !== 'switch') continue;
+    const ports = device.interfaces.map((entry) => entry.id);
+    for (const port of ports) {
+      for (const peer of ports) {
+        if (port !== peer) neighbours.get(port).add(peer);
+      }
+    }
+  }
+
+  const domainByInterface = new Map();
+  const domains = [];
+  for (const interfaceId of owners.keys()) {
+    if (domainByInterface.has(interfaceId)) continue;
+    const queue = [interfaceId];
+    const members = [];
+    const domain = { members };
+    domainByInterface.set(interfaceId, domain);
+    while (queue.length > 0) {
+      const current = queue.shift();
+      members.push(owners.get(current));
+      for (const peer of neighbours.get(current)) {
+        if (!domainByInterface.has(peer)) {
+          domainByInterface.set(peer, domain);
+          queue.push(peer);
+        }
+      }
+    }
+    domains.push(domain);
+  }
+  return { domains, domainByInterface };
+}
+
+function validateLinkedSubnets(domains) {
+  const diagnostics = [];
+  for (const domain of domains) {
+    const addressed = domain.members.filter(({ entry }) => Number.isInteger(entry.address));
+    for (let index = 0; index < addressed.length; index += 1) {
+      for (let otherIndex = index + 1; otherIndex < addressed.length; otherIndex += 1) {
+        const left = addressed[index];
+        const right = addressed[otherIndex];
+        if (sameSubnet(left.entry.address, right.entry.address, left.entry.prefix)
+          && sameSubnet(left.entry.address, right.entry.address, right.entry.prefix)) continue;
+        const rightField = editableFieldFor(right.device, 'interfaces', right.entry, 'address');
+        const leftField = editableFieldFor(left.device, 'interfaces', left.entry, 'address');
+        const focus = rightField ? right : leftField ? left : right;
       diagnostics.push(diagnostic('different-subnet', {
-        deviceId: left.device.id,
-        field: editableFieldFor(left.device, 'interfaces', left.entry, 'address'),
-        params: { peerDeviceId: right.device.id, prefix: left.entry.prefix },
+          deviceId: focus.device.id,
+          field: editableFieldFor(focus.device, 'interfaces', focus.entry, 'address'),
+          params: {
+            peerDeviceId: focus === left ? right.device.id : left.device.id,
+            prefix: focus.entry.prefix,
+          },
+      }));
+      }
+    }
+  }
+  return diagnostics;
+}
+
+function validateAddressUniqueness(topology) {
+  const byAddress = new Map();
+  const diagnostics = [];
+  for (const device of topology.devices) {
+    for (const entry of device.interfaces) {
+      if (!Number.isInteger(entry.address)) continue;
+      const previous = byAddress.get(entry.address);
+      if (!previous) {
+        byAddress.set(entry.address, { device, entry });
+        continue;
+      }
+      const currentField = editableFieldFor(device, 'interfaces', entry, 'address');
+      const previousField = editableFieldFor(previous.device, 'interfaces', previous.entry, 'address');
+      const focus = currentField ? { device, entry } : previousField ? previous : { device, entry };
+      const peer = focus === previous ? { device, entry } : previous;
+      diagnostics.push(diagnostic('duplicate-address', {
+        deviceId: focus.device.id,
+        field: editableFieldFor(focus.device, 'interfaces', focus.entry, 'address'),
+        params: {
+          address: formatIPv4(entry.address),
+          peerDeviceId: peer.device.id,
+          peerInterfaceId: peer.entry.id,
+        },
       }));
     }
   }
@@ -215,13 +296,28 @@ function validateOverlaps(topology) {
   return diagnostics;
 }
 
-function validateGateways(topology) {
+function gatewayPeer(domains, device, route) {
+  for (const localInterface of device.interfaces) {
+    if (!Number.isInteger(localInterface.address)
+      || !Number.isInteger(localInterface.prefix)
+      || !sameSubnet(localInterface.address, route.gateway, localInterface.prefix)
+      || hostAddressCode(route.gateway, localInterface.prefix)
+      || localInterface.address === route.gateway) continue;
+    const domain = domains.domainByInterface.get(localInterface.id);
+    const peer = domain?.members.find(({ device: peerDevice, entry }) => peerDevice.id !== device.id
+      && entry.address === route.gateway
+      && (device.kind === 'host' ? peerDevice.kind === 'router' : ['router', 'internet'].includes(peerDevice.kind)));
+    if (peer) return { localInterface, peer };
+  }
+  return null;
+}
+
+function validateGateways(topology, domains) {
   const diagnostics = [];
   for (const device of topology.devices) {
     for (const route of device.routes) {
-      const localInterface = device.interfaces.find((entry) => Number.isInteger(entry.address)
-        && sameSubnet(entry.address, route.gateway, entry.prefix));
-      if (!localInterface) {
+      const peer = gatewayPeer(domains, device, route);
+      if (!peer) {
         const referenceInterface = device.interfaces.find((entry) => Number.isInteger(entry.address));
         diagnostics.push(diagnostic(device.kind === 'host' ? 'unreachable-gateway' : 'unreachable-next-hop', {
           deviceId: device.id,
@@ -238,20 +334,19 @@ function validateGateways(topology) {
   return diagnostics;
 }
 
-function directlyConnected(source, destination) {
+function directlyConnected(domains, source, destination) {
   return source.interfaces.some((left) => Number.isInteger(left.address)
     && destination.interfaces.some((right) => Number.isInteger(right.address)
-      && sameSubnet(left.address, right.address, left.prefix)
-      && sameSubnet(left.address, right.address, right.prefix)));
+      && domains.domainByInterface.get(left.id) === domains.domainByInterface.get(right.id)));
 }
 
-function validateDefaultRoutes(topology) {
+function validateDefaultRoutes(topology, domains) {
   const devices = new Map(topology.devices.map((device) => [device.id, device]));
   const diagnostics = [];
   for (const goal of topology.goals) {
     const source = devices.get(goal.sourceId);
     const destination = devices.get(goal.destinationId);
-    if (!source || !destination || source.kind !== 'host' || directlyConnected(source, destination)) continue;
+    if (!source || !destination || source.kind !== 'host' || directlyConnected(domains, source, destination)) continue;
     if (!source.routes.some((route) => route.destination === 0 && route.prefix === 0)) {
       diagnostics.push(diagnostic('missing-default-route', {
         deviceId: source.id,
@@ -329,15 +424,18 @@ export function validateSubmission(exercise, submission) {
 
   const configured = applySubmission(exercise, parsed.values);
   const hostDiagnostics = validateHostAddresses(configured);
-  const subnetDiagnostics = validateLinkedSubnets(configured);
-  const gatewayDiagnostics = validateGateways(configured);
-  const defaultDiagnostics = validateDefaultRoutes(configured);
+  const duplicateDiagnostics = validateAddressUniqueness(configured);
+  const domains = buildLayer2Domains(configured);
+  const subnetDiagnostics = validateLinkedSubnets(domains.domains);
+  const gatewayDiagnostics = validateGateways(configured, domains);
+  const defaultDiagnostics = validateDefaultRoutes(configured, domains);
   const routeDiagnostics = validateRouteDestinations(exercise, configured);
   const overlapDiagnostics = validateOverlaps(configured);
   const traces = configured.goals.map((goal) => validateRoundTrip(configured, goal.sourceId, goal.destinationId));
   const pathDiagnostics = diagnosticsFromTraces(traces);
   const diagnostics = [
     ...hostDiagnostics,
+    ...duplicateDiagnostics,
     ...subnetDiagnostics,
     ...gatewayDiagnostics,
     ...defaultDiagnostics,

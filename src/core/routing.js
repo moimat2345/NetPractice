@@ -68,14 +68,15 @@ function findLayer2Peers(topology, startInterfaceId) {
   return peers;
 }
 
-export function tracePacket(topology, sourceId, destinationIp) {
+export function tracePacket(topology, sourceId, destinationIp, destinationId = null) {
   const devices = new Map(topology.devices.map((device) => [device.id, device]));
   const visited = new Set();
   const hops = [];
   let current = devices.get(sourceId);
 
   while (current && hops.length <= topology.devices.length * 2) {
-    if (current.interfaces.some((entry) => entry.address === destinationIp)) {
+    if ((destinationId === null || current.id === destinationId)
+      && current.interfaces.some((entry) => entry.address === destinationIp)) {
       return freezeTrace({ ok: true, hops });
     }
 
@@ -116,13 +117,13 @@ export function tracePacket(topology, sourceId, destinationIp) {
 export function validateRoundTrip(topology, sourceId, destinationId) {
   const source = topology.devices.find((device) => device.id === sourceId);
   const destination = topology.devices.find((device) => device.id === destinationId);
-  const forward = tracePacket(topology, sourceId, destination.interfaces[0].address);
+  const forward = tracePacket(topology, sourceId, destination.interfaces[0].address, destinationId);
 
   if (!forward.ok) {
     return Object.freeze({ ok: false, failedDirection: 'forward', forward, return: null });
   }
 
-  const back = tracePacket(topology, destinationId, source.interfaces[0].address);
+  const back = tracePacket(topology, destinationId, source.interfaces[0].address, sourceId);
   return Object.freeze(back.ok
     ? { ok: true, failedDirection: null, forward, return: back }
     : { ok: false, failedDirection: 'return', forward, return: back });

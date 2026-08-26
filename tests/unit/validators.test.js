@@ -122,6 +122,35 @@ describe('validateSubmission', () => {
       diagnostics: [{ code: 'wrong-default-gateway', field }],
     });
   });
+
+  it('rejects duplicate addresses in a focused exercise before accepting its trace', () => {
+    const exercise = generateFocusedExercise({ seed: 'duplicate-focused', concept: 'same-subnet', difficulty: 2 });
+    const field = exercise.editableFields[0];
+    const routerAddress = exercise.devices.find((device) => device.id === 'router').interfaces[0].address;
+
+    expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: formatIPv4(routerAddress) }))
+      .toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'duplicate-address', field, deviceId: 'host-a' }),
+        ]),
+      });
+  });
+
+  it('rejects a duplicate advanced-mission address even when it matches the target router interface', () => {
+    const exercise = generateMission({ seed: 'duplicate-mission', difficulty: 3 });
+    const field = exercise.editableFields.find((candidate) => candidate.endsWith('alpha-lan.address'));
+    const atlasLan = exercise.devices.find((device) => device.id === 'atlas')
+      .interfaces.find((entry) => entry.id === 'atlas-lan-a').address;
+
+    expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: formatIPv4(atlasLan) }))
+      .toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'duplicate-address', field, deviceId: 'alpha' }),
+        ]),
+      });
+  });
 });
 
 describe('address and gateway diagnostics', () => {
@@ -139,6 +168,62 @@ describe('address and gateway diagnostics', () => {
   it('identifies a gateway outside the local interface network', () => {
     expect(validateGateway({ address: '192.168.12.65', prefix: 27 }, '192.168.13.1'))
       .toMatchObject({ code: 'unreachable-gateway', params: { prefix: 27 } });
+  });
+
+  it('accepts only the reachable router interface as the gateway workshop answer', () => {
+    const exercise = getWorkshopGenerator('valid-gateway-2')({ seed: 'gateway-semantics' });
+    const field = exercise.editableFields[0];
+    const host = exercise.devices.find((device) => device.id === 'host-a').interfaces[0];
+    const router = exercise.devices.find((device) => device.id === 'router').interfaces[0];
+    const candidates = [
+      formatIPv4(exercise.facts.network),
+      formatIPv4(exercise.facts.broadcast),
+      formatIPv4(host.address),
+      formatIPv4(host.address + 1),
+    ];
+
+    expect(validateSubmission(exercise, validSubmission(exercise))).toMatchObject({ ok: true });
+    for (const gateway of candidates) {
+      expect(gateway).not.toBe(formatIPv4(router.address));
+      expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: gateway }))
+        .toMatchObject({
+          ok: false,
+          diagnostics: expect.arrayContaining([
+            expect.objectContaining({ code: 'unreachable-gateway', field }),
+          ]),
+        });
+    }
+  });
+
+  it('rejects a same-subnet host peer as a gateway', () => {
+    const exercise = copyExercise(getWorkshopGenerator('valid-gateway-2')({ seed: 'gateway-peer-kind' }));
+    const field = exercise.editableFields[0];
+    const host = exercise.devices.find((device) => device.id === 'host-a').interfaces[0];
+    const router = exercise.devices.find((device) => device.id === 'router').interfaces[0];
+    const impostorAddress = host.address + 1 === router.address ? host.address + 2 : host.address + 1;
+    exercise.links = [
+      { a: 'host-a-lan', b: 'switch-host' },
+      { a: 'router-lan', b: 'switch-router' },
+      { a: 'impostor-lan', b: 'switch-impostor' },
+    ];
+    exercise.devices.push({
+      id: 'switch', kind: 'switch', interfaces: [
+        { id: 'switch-host', address: null, prefix: null },
+        { id: 'switch-router', address: null, prefix: null },
+        { id: 'switch-impostor', address: null, prefix: null },
+      ], routes: [],
+    });
+    exercise.devices.push({
+      id: 'impostor', kind: 'host', interfaces: [{ id: 'impostor-lan', address: impostorAddress, prefix: host.prefix }], routes: [],
+    });
+
+    expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: formatIPv4(impostorAddress) }))
+      .toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'unreachable-gateway', field }),
+        ]),
+      });
   });
 
   it('reports network and broadcast addresses when they are assigned to an editable host', () => {
@@ -215,6 +300,34 @@ describe('topology diagnostics', () => {
       .toMatchObject({ diagnostics: expect.arrayContaining([
         expect.objectContaining({ code: 'different-subnet', deviceId: 'host-a', field }),
       ]) });
+  });
+
+  it('reports a different subnet across an unnumbered switch instead of inventing a default route', () => {
+    const exercise = getWorkshopGenerator('switch-segment-2')({ seed: 'switch-domain' });
+    const field = exercise.editableFields[0];
+
+    expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: '10.0.0.1' }))
+      .toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'different-subnet', deviceId: 'host-b', field }),
+        ]),
+      });
+    expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: '10.0.0.1' }).diagnostics)
+      .not.toContainEqual(expect.objectContaining({ code: 'missing-default-route' }));
+  });
+
+  it('reports an edited advanced host that leaves its switch L2 domain', () => {
+    const exercise = generateMission({ seed: 'switch-mission-domain', difficulty: 3 });
+    const field = exercise.editableFields.find((candidate) => candidate.endsWith('alpha-lan.address'));
+
+    expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: '203.0.113.2' }))
+      .toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'different-subnet', deviceId: 'alpha', field }),
+        ]),
+      });
   });
 
   it('never accepts a required goal whose forward trace fails', () => {

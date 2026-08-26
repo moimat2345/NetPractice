@@ -147,6 +147,18 @@ describe('routing', () => {
     expect(validateRoundTrip(topology, 'host-a', 'router').ok).toBe(true);
   });
 
+  it('does not treat another device with the target IP as the requested destination', () => {
+    const topology = makeRoutedTopology();
+    topology.links = [{ a: 'a1', b: 'r1' }];
+    topology.devices[1].interfaces[1].address = topology.devices[2].interfaces[0].address;
+
+    expect(validateRoundTrip(topology, 'a', 'b')).toMatchObject({
+      ok: false,
+      failedDirection: 'forward',
+      forward: { ok: false, reason: 'missing-link', deviceId: 'r' },
+    });
+  });
+
   it('returns an immutable trace result', () => {
     const topology = makeRoutedTopology();
     const route = topology.devices[0].routes[0];

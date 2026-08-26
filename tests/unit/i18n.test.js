@@ -14,6 +14,7 @@ const taskSixDiagnosticKeys = [
   'diagnostic.broadcast-address',
   'diagnostic.different-subnet',
   'diagnostic.overlapping-subnets',
+  'diagnostic.duplicate-address',
   'diagnostic.unreachable-gateway',
   'diagnostic.unreachable-next-hop',
   'diagnostic.missing-default-route',
