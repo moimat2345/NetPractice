@@ -101,6 +101,22 @@ function applySubmission(exercise, values) {
   return configured;
 }
 
+function validateCalculatedAnswers(exercise, values) {
+  const diagnostics = [];
+  for (const [field, value] of values) {
+    const meta = exercise.fieldMeta?.[field];
+    if (fieldLocation(field) || !meta || meta.kind !== 'address') continue;
+    const expected = parseIPv4(exercise.solution[field]);
+    if (expected !== null && value !== expected) {
+      diagnostics.push(diagnostic('incorrect-calculation', {
+        field,
+        params: { role: meta.role },
+      }));
+    }
+  }
+  return diagnostics;
+}
+
 function editableFieldFor(device, section, entry, property) {
   const field = `${device.id}.${section}.${entry.id}.${property}`;
   return entry.editable?.[property] ? field : null;
@@ -179,10 +195,15 @@ function validateGateways(topology) {
       const localInterface = device.interfaces.find((entry) => Number.isInteger(entry.address)
         && sameSubnet(entry.address, route.gateway, entry.prefix));
       if (!localInterface) {
+        const referenceInterface = device.interfaces.find((entry) => Number.isInteger(entry.address));
         diagnostics.push(diagnostic(device.kind === 'host' ? 'unreachable-gateway' : 'unreachable-next-hop', {
           deviceId: device.id,
           field: editableFieldFor(device, 'routes', route, 'gateway'),
-          params: { gateway: Number.isInteger(route.gateway) ? formatIPv4(route.gateway) : route.gateway },
+          params: {
+            gateway: Number.isInteger(route.gateway) ? formatIPv4(route.gateway) : route.gateway,
+            localAddress: referenceInterface ? formatIPv4(referenceInterface.address) : null,
+            prefix: referenceInterface?.prefix ?? null,
+          },
         }));
       }
     }
@@ -217,21 +238,29 @@ function validateDefaultRoutes(topology) {
 
 function validateRouteDestinations(exercise, topology) {
   const diagnostics = [];
+  const seenRoutes = new Set();
   for (const field of exercise.editableFields) {
     const meta = exercise.fieldMeta?.[field];
-    if (meta?.role !== 'route-destination') continue;
-    const expected = parseIPv4(exercise.solution[field]);
+    if (!['route-destination', 'route-prefix'].includes(meta?.role)) continue;
     const location = fieldLocation(field);
+    const routeKey = `${location?.deviceId}:${location?.entryId}`;
+    if (!location || seenRoutes.has(routeKey)) continue;
+    seenRoutes.add(routeKey);
     const device = topology.devices.find((candidate) => candidate.id === location?.deviceId);
     const route = device?.routes.find((candidate) => candidate.id === location?.entryId);
-    if (expected === null || !route) continue;
+    const destinationField = `${location.deviceId}.routes.${location.entryId}.destination`;
+    const prefixField = `${location.deviceId}.routes.${location.entryId}.prefix`;
+    const expectedDestination = parseIPv4(exercise.solution[destinationField]);
+    const expectedPrefix = exercise.fieldMeta?.[destinationField]?.prefix;
+    if (expectedDestination === null || !Number.isInteger(expectedPrefix) || !route) continue;
     const intendedEndpoint = topology.devices
       .flatMap((candidate) => candidate.interfaces)
-      .find((entry) => Number.isInteger(entry.address) && networkOf(entry.address, route.prefix) === expected);
+      .find((entry) => Number.isInteger(entry.address)
+        && networkOf(entry.address, expectedPrefix) === expectedDestination);
     if (intendedEndpoint && networkOf(intendedEndpoint.address, route.prefix) !== route.destination) {
       diagnostics.push(diagnostic('wrong-route-destination', {
         deviceId: device.id,
-        field,
+        field: route.destination !== expectedDestination ? destinationField : prefixField,
         params: { destination: formatIPv4(route.destination), prefix: route.prefix },
       }));
     }
@@ -243,6 +272,13 @@ function diagnosticsFromTraces(traces) {
   const diagnostics = [];
   for (const trace of traces) {
     if (trace.ok) continue;
+    if (trace.failedDirection === 'forward') {
+      diagnostics.push(diagnostic('unreachable-destination', {
+        deviceId: trace.forward?.deviceId ?? null,
+        field: null,
+        params: { reason: trace.forward?.reason ?? 'missing-route' },
+      }));
+    }
     if (trace.failedDirection === 'return') {
       diagnostics.push(diagnostic('missing-return-path', {
         deviceId: trace.return?.deviceId ?? null,
@@ -257,6 +293,11 @@ function diagnosticsFromTraces(traces) {
 export function validateSubmission(exercise, submission) {
   const parsed = parseEditableFields(exercise, submission);
   if (parsed.diagnostics.length > 0) return { ok: false, diagnostics: parsed.diagnostics, traces: [] };
+
+  const calculatedDiagnostics = validateCalculatedAnswers(exercise, parsed.values);
+  if (calculatedDiagnostics.length > 0) {
+    return { ok: false, diagnostics: calculatedDiagnostics, traces: [] };
+  }
 
   const configured = applySubmission(exercise, parsed.values);
   const hostDiagnostics = validateHostAddresses(configured);
@@ -276,5 +317,5 @@ export function validateSubmission(exercise, submission) {
     ...overlapDiagnostics,
     ...pathDiagnostics,
   ];
-  return { ok: diagnostics.length === 0, diagnostics, traces };
+  return { ok: diagnostics.length === 0 && traces.every((trace) => trace.ok), diagnostics, traces };
 }

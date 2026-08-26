@@ -1,3 +1,6 @@
+import { formatIPv4, parseIPv4 } from '../core/ipv4.js';
+import { broadcastOf, networkOf } from '../core/subnet.js';
+
 const hintKeys = {
   'unreachable-gateway': ['hint.gateway.observe', 'hint.gateway.method', 'hint.gateway.nearSolution'],
   'different-subnet': ['hint.subnet.observe', 'hint.subnet.method', 'hint.subnet.nearSolution'],
@@ -9,6 +12,17 @@ function describeExpectedShape(exercise, field) {
   if (meta?.kind === 'prefix' || field?.endsWith('.prefix')) return 'CIDR prefix';
   if (meta?.kind === 'address' || field?.endsWith('.address') || field?.endsWith('.gateway')) return 'IPv4 address';
   return 'network value';
+}
+
+function deriveNearSolutionParams(diagnostic) {
+  const params = diagnostic.params ?? {};
+  const localAddress = parseIPv4(params.localAddress);
+  if (!Number.isInteger(params.prefix) || localAddress === null) return params;
+  return {
+    ...params,
+    network: formatIPv4(networkOf(localAddress, params.prefix)),
+    broadcast: formatIPv4(broadcastOf(localAddress, params.prefix)),
+  };
 }
 
 export function getHint(exercise, validation, level) {
@@ -23,6 +37,6 @@ export function getHint(exercise, validation, level) {
     ? { deviceId: diagnostic.deviceId }
     : level === 2
       ? diagnostic.params
-      : { ...diagnostic.params, expectedShape: describeExpectedShape(exercise, diagnostic.field) };
+      : { ...deriveNearSolutionParams(diagnostic), expectedShape: describeExpectedShape(exercise, diagnostic.field) };
   return { key: keys[level - 1], params };
 }

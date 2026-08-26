@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formatIPv4 } from '../../src/core/ipv4.js';
 import { generateFocusedExercise, generateMission } from '../../src/exercises/generators.js';
 import {
   classifyHostAddress,
@@ -50,6 +51,36 @@ describe('validateSubmission', () => {
 
     expect(validateSubmission(exercise, validSubmission(exercise)))
       .toMatchObject({ ok: true, diagnostics: [], traces: [{ ok: true }] });
+  });
+
+  it('rejects each valid-but-incorrect calculated range answer', () => {
+    const exercise = generateFocusedExercise({ seed: 'range-answer-1', concept: 'host-range', difficulty: 2 });
+    const { network, broadcast, usable, prefix } = exercise.facts;
+    const allRangeAnswers = {
+      'range.network': formatIPv4(network),
+      'range.broadcast': formatIPv4(broadcast),
+      'range.first-host': formatIPv4(usable.first),
+      'range.last-host': formatIPv4(usable.last),
+    };
+    exercise.editableFields = Object.keys(allRangeAnswers);
+    exercise.initial = Object.fromEntries(exercise.editableFields.map((field) => [field, '']));
+    exercise.solution = allRangeAnswers;
+    exercise.fieldMeta = Object.fromEntries(exercise.editableFields.map((field) => [field, {
+      kind: 'address', role: field.slice('range.'.length), prefix,
+    }]));
+
+    for (const field of exercise.editableFields) {
+      const submission = { ...validSubmission(exercise), [field]: '203.0.113.77' };
+      const result = validateSubmission(exercise, submission);
+
+      expect(submission[field]).not.toBe(exercise.solution[field]);
+      expect(result).toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'incorrect-calculation', field }),
+        ]),
+      });
+    }
   });
 });
 
@@ -143,6 +174,30 @@ describe('topology diagnostics', () => {
     expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: '10.0.0.1' }))
       .toMatchObject({ diagnostics: expect.arrayContaining([
         expect.objectContaining({ code: 'different-subnet', deviceId: 'host-a', field }),
+      ]) });
+  });
+
+  it('never accepts a required goal whose forward trace fails', () => {
+    const exercise = copyExercise(generateFocusedExercise({ seed: 'forward-link-1', concept: 'gateway', difficulty: 2 }));
+    exercise.links = [];
+
+    expect(validateSubmission(exercise, validSubmission(exercise)))
+      .toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({ code: 'unreachable-destination', params: { reason: 'missing-link' } }),
+        ]),
+        traces: [{ ok: false, failedDirection: 'forward' }],
+      });
+  });
+
+  it('reports a route prefix that no longer covers its intended remote network', () => {
+    const exercise = generateMission({ seed: 'destination-prefix-1', difficulty: 3 });
+    const field = exercise.editableFields.find((candidate) => candidate.endsWith('atlas-lan-b.prefix'));
+
+    expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: '/32' }))
+      .toMatchObject({ diagnostics: expect.arrayContaining([
+        expect.objectContaining({ code: 'wrong-route-destination', field }),
       ]) });
   });
 });
