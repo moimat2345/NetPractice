@@ -1,9 +1,12 @@
 import {
+  closeSync,
   lstatSync,
   mkdtempSync,
   mkdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,6 +34,28 @@ function errorMessage(action) {
   } catch (error) {
     return error.message;
   }
+}
+
+function raceFixture() {
+  const fixture = fixtureDirectory();
+  const allowedRoot = join(fixture, 'public');
+  const parent = join(allowedRoot, 'assets');
+  const outside = join(fixture, 'outside');
+  mkdirSync(parent, { recursive: true });
+  mkdirSync(outside);
+  writeFileSync(join(parent, 'app.js'), 'export const source = "inside";');
+  writeFileSync(join(outside, 'app.js'), 'export const source = "outside";');
+  return {
+    allowedRoot,
+    file: {
+      absolutePath: join(parent, 'app.js'),
+      relativePath: 'assets/app.js',
+      rootPath: allowedRoot,
+    },
+    fixture,
+    outside,
+    parent,
+  };
 }
 
 afterEach(() => {
@@ -263,6 +288,7 @@ describe('assertPublicPathsSafe', () => {
     const message = errorMessage(() => assertExecutableReferencesSafe([{
       absolutePath: join(root, 'unexpected-entry'),
       relativePath: 'assets/app.js',
+      rootPath: root,
     }]));
 
     expect(message).toMatch(/assets\/app\.js/);
@@ -309,5 +335,163 @@ describe('assertPublicPathsSafe', () => {
     writeFileSync(join(root, 'index.html'), '<script src="/assets/app.js"></script>');
     const files = listFilesRecursively(root);
     expect(() => assertExecutableReferencesSafe(files)).not.toThrow();
+  });
+
+  it('rejects a parent directory replaced by a symlink before open', () => {
+    const { file, fixture, outside, parent } = raceFixture();
+    const savedParent = join(fixture, 'saved-assets');
+
+    const message = errorMessage(() => assertExecutableReferencesSafe([file], {
+      beforeOpen() {
+        renameSync(parent, savedParent);
+        symlinkSync(outside, parent);
+      },
+    }));
+
+    expect(message).toMatch(/assets\/app\.js/);
+    expect(message).not.toContain('outside');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('rejects a parent symlink race restored after open', () => {
+    const { file, fixture, outside, parent } = raceFixture();
+    const savedParent = join(fixture, 'saved-assets');
+
+    const message = errorMessage(() => assertExecutableReferencesSafe([file], {
+      beforeOpen() {
+        renameSync(parent, savedParent);
+        symlinkSync(outside, parent);
+      },
+      afterOpen() {
+        unlinkSync(parent);
+        renameSync(savedParent, parent);
+      },
+    }));
+
+    expect(message).toMatch(/assets\/app\.js/);
+    expect(message).not.toContain('outside');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('rejects an allowed-root symlink race restored after open', () => {
+    const { allowedRoot, file, fixture, outside } = raceFixture();
+    const savedRoot = join(fixture, 'saved-public');
+    mkdirSync(join(outside, 'assets'));
+    writeFileSync(join(outside, 'assets', 'app.js'), 'export const source = "outside-root";');
+
+    const message = errorMessage(() => assertExecutableReferencesSafe([file], {
+      beforeOpen() {
+        renameSync(allowedRoot, savedRoot);
+        symlinkSync(outside, allowedRoot);
+      },
+      afterOpen() {
+        unlinkSync(allowedRoot);
+        renameSync(savedRoot, allowedRoot);
+      },
+    }));
+
+    expect(message).toMatch(/assets\/app\.js/);
+    expect(message).not.toContain('outside-root');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('rejects a final file replaced by a symlink without O_NOFOLLOW support', () => {
+    const { file, fixture, outside, parent } = raceFixture();
+    const savedFile = join(fixture, 'saved-app.js');
+
+    const message = errorMessage(() => assertExecutableReferencesSafe([file], {
+      noFollowFlag: 0,
+      beforeOpen() {
+        renameSync(file.absolutePath, savedFile);
+        symlinkSync(join(outside, 'app.js'), join(parent, 'app.js'));
+      },
+    }));
+
+    expect(message).toMatch(/assets\/app\.js/);
+    expect(message).not.toContain('outside');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('rejects a final regular file swapped between preflight and open', () => {
+    const { file, fixture } = raceFixture();
+    const savedFile = join(fixture, 'saved-app.js');
+
+    const message = errorMessage(() => assertExecutableReferencesSafe([file], {
+      noFollowFlag: 0,
+      beforeOpen() {
+        renameSync(file.absolutePath, savedFile);
+        writeFileSync(file.absolutePath, 'export const source = "replacement";');
+      },
+    }));
+
+    expect(message).toMatch(/assets\/app\.js/);
+    expect(message).not.toContain('replacement');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('keeps a stable regular file safe without O_NOFOLLOW support', () => {
+    const { file } = raceFixture();
+    expect(() => assertExecutableReferencesSafe([file], { noFollowFlag: 0 })).not.toThrow();
+  });
+
+  it('rejects lexical escapes and a symlink used as the allowed root', () => {
+    const fixture = fixtureDirectory();
+    const allowedRoot = join(fixture, 'public');
+    const outside = join(fixture, 'outside');
+    mkdirSync(allowedRoot);
+    mkdirSync(outside);
+    writeFileSync(join(outside, 'app.js'), 'export const safe = true;');
+
+    const escapedMessage = errorMessage(() => assertExecutableReferencesSafe([{
+      absolutePath: join(outside, 'app.js'),
+      relativePath: '../outside/app.js',
+      rootPath: allowedRoot,
+    }]));
+    expect(escapedMessage).toMatch(/outside\/app\.js/);
+    expect(escapedMessage).not.toContain(fixture);
+
+    const linkedRoot = join(fixture, 'linked-public');
+    symlinkSync(outside, linkedRoot);
+    const linkedMessage = errorMessage(() => assertExecutableReferencesSafe([{
+      absolutePath: join(linkedRoot, 'app.js'),
+      relativePath: 'app.js',
+      rootPath: linkedRoot,
+    }]));
+    expect(linkedMessage).toMatch(/app\.js/);
+    expect(linkedMessage).not.toContain('outside');
+    expect(linkedMessage).not.toContain(fixture);
+  });
+
+  it('fails closed on injected readdir, open, fstat, and close errors', () => {
+    const fixture = fixtureDirectory();
+    const root = join(fixture, 'public');
+    mkdirSync(root);
+    writeFileSync(join(root, 'app.js'), 'export const safe = true;');
+
+    const readdirMessage = errorMessage(() => listFilesRecursively(root, {
+      readdirSync() {
+        throw new Error('must-not-leak-readdir-details');
+      },
+    }));
+    expect(readdirMessage).toMatch(/public/);
+    expect(readdirMessage).not.toContain('must-not-leak-readdir-details');
+    expect(readdirMessage).not.toContain(fixture);
+
+    const files = listFilesRecursively(root);
+    for (const [operation, implementation] of [
+      ['openSync', () => { throw new Error('must-not-leak-open-details'); }],
+      ['fstatSync', () => { throw new Error('must-not-leak-fstat-details'); }],
+      ['closeSync', (descriptor) => {
+        closeSync(descriptor);
+        throw new Error('must-not-leak-close-details');
+      }],
+    ]) {
+      const message = errorMessage(() => assertExecutableReferencesSafe(files, {
+        [operation]: implementation,
+      }));
+      expect(message).toMatch(/app\.js/);
+      expect(message).not.toContain('must-not-leak');
+      expect(message).not.toContain(fixture);
+    }
   });
 });

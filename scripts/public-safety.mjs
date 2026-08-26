@@ -8,7 +8,7 @@ import {
   readFileSync,
   readdirSync,
 } from 'node:fs';
-import { basename, extname, relative, resolve, sep } from 'node:path';
+import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const forbidden = [
@@ -28,7 +28,11 @@ function normalizedRelativePath(root, path) {
 }
 
 function fileRecord(path, root) {
-  return { absolutePath: path, relativePath: normalizedRelativePath(root, path) };
+  return {
+    absolutePath: path,
+    relativePath: normalizedRelativePath(root, path),
+    rootPath: root,
+  };
 }
 
 function reportedPath(root, path) {
@@ -52,6 +56,9 @@ export function listFilesRecursively(rootPath, operations = {}) {
     rootEntry = inspect(root);
   } catch (error) {
     if (error?.code === 'ENOENT') return [];
+    throwUnsafeFilesystemEntries([basename(root)]);
+  }
+  if (rootEntry.isSymbolicLink() || !rootEntry.isDirectory()) {
     throwUnsafeFilesystemEntries([basename(root)]);
   }
 
@@ -216,24 +223,85 @@ function isForbiddenReference(reference) {
     || /(^|\/)en\.subject _netpractice\.pdf$/.test(normalized);
 }
 
+function filesystemIdentity(entry) {
+  const type = entry.isDirectory() ? 'directory' : entry.isFile() ? 'file' : 'other';
+  return {
+    device: entry.dev,
+    inode: entry.ino,
+    mode: entry.mode,
+    type,
+  };
+}
+
+function sameFilesystemIdentity(left, right) {
+  return left.device === right.device
+    && left.inode === right.inode
+    && left.mode === right.mode
+    && left.type === right.type;
+}
+
+function lexicalComponentPaths(file) {
+  if (!file.rootPath) return null;
+  const root = resolve(file.rootPath);
+  const target = resolve(file.absolutePath);
+  const fromRoot = relative(root, target);
+  if (!fromRoot || fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot)) {
+    return null;
+  }
+
+  const components = [root];
+  let current = root;
+  fromRoot.split(sep).filter(Boolean).forEach((part) => {
+    current = resolve(current, part);
+    components.push(current);
+  });
+  return components;
+}
+
+function inspectComponentChain(file, inspect) {
+  const paths = lexicalComponentPaths(file);
+  if (!paths) return null;
+  const identities = [];
+
+  for (let index = 0; index < paths.length; index += 1) {
+    let entry;
+    try {
+      entry = inspect(paths[index]);
+    } catch {
+      return null;
+    }
+    const isFinal = index === paths.length - 1;
+    if (entry.isSymbolicLink()
+      || (isFinal ? !entry.isFile() : !entry.isDirectory())) {
+      return null;
+    }
+    identities.push(filesystemIdentity(entry));
+  }
+
+  return { identities, paths };
+}
+
+function componentChainsMatch(before, after) {
+  return before.paths.length === after.paths.length
+    && before.paths.every((path, index) => path === after.paths[index]
+      && sameFilesystemIdentity(before.identities[index], after.identities[index]));
+}
+
 function readableFileRecords(files, operations = {}) {
   const inspect = operations.lstatSync ?? lstatSync;
   const open = operations.openSync ?? openSync;
   const inspectOpenFile = operations.fstatSync ?? fstatSync;
   const read = operations.readFileSync ?? readFileSync;
   const close = operations.closeSync ?? closeSync;
+  const noFollowFlag = Number.isInteger(operations.noFollowFlag)
+    ? operations.noFollowFlag
+    : Number.isInteger(constants.O_NOFOLLOW) ? constants.O_NOFOLLOW : 0;
   const records = [];
   const unsafe = [];
 
   files.forEach((file) => {
-    let entry;
-    try {
-      entry = inspect(file.absolutePath);
-    } catch {
-      unsafe.push(file.relativePath);
-      return;
-    }
-    if (!entry.isFile() || entry.isSymbolicLink()) {
+    const before = inspectComponentChain(file, inspect);
+    if (!before) {
       unsafe.push(file.relativePath);
       return;
     }
@@ -242,11 +310,22 @@ function readableFileRecords(files, operations = {}) {
     let text;
     let failed = false;
     try {
-      descriptor = open(file.absolutePath, constants.O_RDONLY | constants.O_NOFOLLOW);
-      if (!inspectOpenFile(descriptor).isFile()) {
+      operations.beforeOpen?.(file);
+      descriptor = open(file.absolutePath, constants.O_RDONLY | noFollowFlag);
+      const openedEntry = inspectOpenFile(descriptor);
+      if (!openedEntry.isFile()) {
         failed = true;
       } else {
-        text = read(descriptor, 'utf8');
+        const openedIdentity = filesystemIdentity(openedEntry);
+        operations.afterOpen?.(file, descriptor);
+        const after = inspectComponentChain(file, inspect);
+        if (!after
+          || !componentChainsMatch(before, after)
+          || !sameFilesystemIdentity(openedIdentity, after.identities.at(-1))) {
+          failed = true;
+        } else {
+          text = read(descriptor, 'utf8');
+        }
       }
     } catch {
       failed = true;
@@ -308,7 +387,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     .filter(Boolean);
   assertPublicPathsSafe(tracked);
   const trackedFiles = tracked
-    .map((path) => ({ absolutePath: resolve(root, path), relativePath: path }));
+    .map((path) => ({ absolutePath: resolve(root, path), relativePath: path, rootPath: root }));
   assertExecutableReferencesSafe(trackedFiles);
 
   const emittedFiles = listFilesRecursively(resolve(root, 'dist'));
