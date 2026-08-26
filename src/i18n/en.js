@@ -26,6 +26,7 @@ export const en = {
     method: 'Method',
     practice: 'Your turn',
     completed: 'Complete',
+    inProgress: 'In progress',
     next: 'Up next',
     locked: 'Coming up',
     duration: '{minutes} min',

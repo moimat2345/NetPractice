@@ -18,7 +18,7 @@ test('supports keyboard device selection with persistent visible focus', async (
   expect(focus.width).toBeGreaterThanOrEqual(2);
 });
 
-test('keeps completed progress and language after reload', async ({ page }) => {
+test('keeps workshop progress and language after reload', async ({ page }) => {
   await page.goto('/#/workshops/ipv4-validity-1?seed=release-progress');
 
   await page.getByLabel(/ip address|adresse ip/i).fill('10.42.0.7');
@@ -28,7 +28,7 @@ test('keeps completed progress and language after reload', async ({ page }) => {
   await page.reload();
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByRole('banner').getByText('1 / 6')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('0 / 6')).toBeVisible();
   await expect.poll(async () => page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('subnet-notes-progress'));
     return {

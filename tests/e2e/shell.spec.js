@@ -20,6 +20,26 @@ function contrastRatio(first, second) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+const workshopIds = [
+  'ipv4-validity-1', 'ipv4-octets-2',
+  'mask-conversion-1', 'subnet-range-1', 'usable-host-2', 'same-subnet-3',
+  'neighbors-1', 'switch-segment-2',
+  'router-interface-1', 'valid-gateway-2', 'direct-network-3',
+  'route-parts-1', 'default-route-2', 'packet-path-3', 'return-path-4', 'routing-mission-5',
+  'guided-mission-1', 'guided-mission-2', 'mock-exam',
+];
+
+function storedProgress(locale, completedIds) {
+  return {
+    version: 1,
+    locale,
+    completed: Object.fromEntries(completedIds.map((id) => [id, { attempts: 1 }])),
+    current: null,
+    exams: [],
+    bestExamSeconds: null,
+  };
+}
+
 test('shows the learning path and switches language without reload', async ({ page }, testInfo) => {
   await page.goto('/');
 
@@ -42,25 +62,59 @@ test('shows the learning path and switches language without reload', async ({ pa
 });
 
 test('restores saved progress in the shell', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('subnet-notes-progress', JSON.stringify({
-      version: 1,
-      locale: 'en',
-      completed: {
-        'ipv4-validity-1': { attempts: 1 },
-        'subnet-range-1': { attempts: 2 },
-        'removed-workshop': { attempts: 3 },
-      },
-      current: null,
-      exams: [],
-      bestExamSeconds: null,
-    }));
-  });
+  const saved = storedProgress('en', [
+    'ipv4-validity-1', 'ipv4-octets-2',
+    'mask-conversion-1', 'subnet-range-1', 'usable-host-2', 'same-subnet-3',
+    'removed-workshop',
+  ]);
+  await page.addInitScript((value) => {
+    localStorage.setItem('subnet-notes-progress', JSON.stringify(value));
+  }, saved);
 
   await page.goto('/');
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('banner').getByText('2 / 6')).toBeVisible();
+});
+
+test('keeps a partial stage in progress and resumes its first unfinished workshop', async ({ page }) => {
+  const saved = storedProgress('en', [
+    'ipv4-validity-1',
+    'ipv4-octets-2',
+    'subnet-range-1',
+  ]);
+  await page.addInitScript((value) => {
+    localStorage.setItem('subnet-notes-progress', JSON.stringify(value));
+  }, saved);
+
+  await page.goto('/');
+
+  await expect(page.getByRole('banner').getByText('1 / 6')).toBeVisible();
+  const subnetStage = page.locator('.ledger-row').filter({ hasText: 'Masks and networks' });
+  await expect(subnetStage).not.toHaveClass(/is-complete/);
+  await expect(subnetStage).toContainText('In progress');
+  await expect(page.locator('.button-primary')).toHaveAttribute('href', '#/workshops/mask-conversion-1');
+  await expect(page.locator('[data-workshop-link]')).toHaveCount(19);
+  await expect(page.locator('[data-workshop-link="mock-exam"]')).toBeVisible();
+  await expect(page.locator('.ledger-row').last().locator('.ledger-exam-link')).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('.button-primary')).toHaveAttribute('href', '#/workshops/mask-conversion-1');
+});
+
+test('offers the mock exam after all nineteen workshops are complete', async ({ page }) => {
+  const saved = storedProgress('en', workshopIds);
+  await page.addInitScript((value) => {
+    localStorage.setItem('subnet-notes-progress', JSON.stringify(value));
+  }, saved);
+
+  await page.goto('/');
+
+  await expect(page.getByRole('banner').getByText('6 / 6')).toBeVisible();
+  await expect(page.locator('.button-primary')).toHaveText('Start mock exam');
+  await expect(page.locator('.button-primary')).toHaveAttribute('href', /^#\/exam\?seed=/);
+  await expect(page.locator('[data-workshop-link]')).toHaveCount(19);
 });
 
 test('skip navigation focuses main content without changing the application route', async ({ page }) => {

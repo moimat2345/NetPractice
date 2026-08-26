@@ -4,19 +4,10 @@ import { renderHome } from './ui/home.js';
 import { createShell } from './ui/shell.js';
 import { renderExam } from './ui/exam.js';
 import { renderWorkshop } from './ui/workshop.js';
-
-const stageEntryWorkshops = {
-  ipv4: 'ipv4-validity-1',
-  subnets: 'subnet-range-1',
-  local: 'neighbors-1',
-  gateways: 'valid-gateway-2',
-  routing: 'route-parts-1',
-  exam: 'guided-mission-1',
-};
+import { completedSectionCount } from './ui/learning-progress.js';
 
 const LEARNING_PATH = curriculum.map((stage) => ({
   id: stage.id,
-  workshopId: stageEntryWorkshops[stage.id] ?? stage.workshops[0],
   workshops: [...stage.workshops],
   titleKey: stage.titleKey,
   summaryKey: `path.${stage.id}.summary`,
@@ -70,7 +61,7 @@ export function createApp(root, dependencies) {
   root.replaceChildren(shell.element);
 
   function refreshShellProgress() {
-    const complete = LEARNING_PATH.filter((section) => Boolean(progress.completed?.[section.workshopId])).length;
+    const complete = completedSectionCount(LEARNING_PATH, progress);
     const value = shell.element.querySelector('.progress-value');
     const meter = shell.element.querySelector('.progress-meter');
     if (value) value.textContent = `${complete} / ${LEARNING_PATH.length}`;

@@ -1,16 +1,18 @@
 import { element } from './dom.js';
 import { lessonsEn } from '../content/lessons.en.js';
 import { lessonsFr } from '../content/lessons.fr.js';
+import {
+  nextWorkshopId,
+  nextWorkshopInSection,
+  sectionCompleted,
+  sectionStarted,
+} from './learning-progress.js';
 
 let examAttemptCounter = 0;
 
 function createExamAttemptSeed() {
   examAttemptCounter += 1;
   return `mock-${Date.now().toString(36)}-${examAttemptCounter.toString(36)}`;
-}
-
-function isComplete(progress, workshopId) {
-  return Boolean(progress?.completed?.[workshopId]);
 }
 
 function routeLink(label, route, className, onNavigate, attributes = {}) {
@@ -26,16 +28,23 @@ function routeLink(label, route, className, onNavigate, attributes = {}) {
 }
 
 export function renderHome({ i18n, progress, sections = [], onNavigate = () => {} }) {
-  const firstPending = sections.find((section) => !isComplete(progress, section.workshopId)) ?? sections[0];
   const examAttemptSeed = createExamAttemptSeed();
+  const nextWorkshop = nextWorkshopId(sections, progress);
+  const pathStarted = sections.some((section) => sectionStarted(section, progress));
+  const heroLabel = nextWorkshop
+    ? i18n.t(pathStarted ? 'action.continue' : 'home.startFirst')
+    : i18n.t('action.startExam');
+  const heroRoute = nextWorkshop
+    ? `/workshops/${nextWorkshop}`
+    : `/exam?seed=${encodeURIComponent(examAttemptSeed)}`;
   const home = element('div', { className: 'home-view' });
   const heroCopy = element('div', { className: 'hero-copy' }, [
     element('p', { className: 'eyebrow' }, [i18n.t('course.eyebrow')]),
     element('h1', { id: 'home-title' }, [i18n.t('course.title')]),
     element('p', { className: 'hero-intro' }, [i18n.t('course.intro')]),
-    firstPending && routeLink(
-      i18n.t('home.startFirst'),
-      `/workshops/${firstPending.workshopId}`,
+    routeLink(
+      heroLabel,
+      heroRoute,
       'button button-primary',
       onNavigate,
     ),
@@ -56,12 +65,16 @@ export function renderHome({ i18n, progress, sections = [], onNavigate = () => {
 
   const ledger = element('ol', { className: 'learning-ledger' });
   const lessons = i18n.locale === 'en' ? lessonsEn : lessonsFr;
-  const firstPendingIndex = sections.findIndex((section) => !isComplete(progress, section.workshopId));
+  const firstPendingIndex = sections.findIndex((section) => !sectionCompleted(section, progress));
   sections.forEach((section, index) => {
-    const complete = isComplete(progress, section.workshopId);
+    const complete = sectionCompleted(section, progress);
+    const started = sectionStarted(section, progress);
     const current = !complete && index === (firstPendingIndex === -1 ? 0 : firstPendingIndex);
-    const stateKey = complete ? 'course.completed' : current ? 'course.next' : 'course.locked';
-    ledger.append(element('li', { className: `ledger-row${current ? ' is-current' : ''}${complete ? ' is-complete' : ''}` }, [
+    const stateKey = complete
+      ? 'course.completed'
+      : started ? 'course.inProgress' : current ? 'course.next' : 'course.locked';
+    const targetWorkshop = nextWorkshopInSection(section, progress) ?? section.workshops[0];
+    ledger.append(element('li', { className: `ledger-row${current ? ' is-current' : ''}${complete ? ' is-complete' : ''}${started && !complete ? ' is-started' : ''}` }, [
       element('span', { className: 'ledger-index', 'aria-hidden': 'true' }, [String(index + 1).padStart(2, '0')]),
       element('div', { className: 'ledger-copy' }, [
         element('p', { className: 'ledger-status' }, [i18n.t(stateKey)]),
@@ -78,8 +91,8 @@ export function renderHome({ i18n, progress, sections = [], onNavigate = () => {
       ]),
       element('div', { className: 'ledger-actions' }, [
         routeLink(
-          i18n.t(current ? 'action.continue' : 'home.openStage'),
-          `/workshops/${section.workshopId}`,
+          i18n.t((current || started) && !complete ? 'action.continue' : 'home.openStage'),
+          `/workshops/${targetWorkshop}`,
           'ledger-link',
           onNavigate,
         ),

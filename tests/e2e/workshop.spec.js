@@ -92,7 +92,22 @@ test('recreates a workshop when only its route seed changes', async ({ page }) =
 });
 
 test('records a successful attempt and refreshes the shell progress', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('subnet-notes-progress', JSON.stringify({
+      version: 1,
+      locale: 'fr',
+      completed: {
+        'mask-conversion-1': { attempts: 1 },
+        'usable-host-2': { attempts: 1 },
+        'same-subnet-3': { attempts: 1 },
+      },
+      current: null,
+      exams: [],
+      bestExamSeconds: null,
+    }));
+  });
   await page.goto('/#/workshops/subnet-range-1?seed=e2e-success');
+  await expect(page.getByRole('banner').getByText('0 / 6')).toBeVisible();
   await page.getByLabel(/adresse réseau/i).fill('10.195.32.0');
   await page.getByLabel(/adresse de diffusion/i).fill('10.195.32.63');
   await page.getByRole('button', { name: /tester le réseau/i }).click();

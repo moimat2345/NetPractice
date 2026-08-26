@@ -1,12 +1,10 @@
 import { element, replace } from './dom.js';
-
-function completedCount(progress, sections) {
-  return sections.filter((section) => isSectionComplete(progress, section)).length;
-}
-
-function isSectionComplete(progress, section) {
-  return Boolean(progress?.completed?.[section.workshopId]);
-}
+import {
+  completedSectionCount,
+  nextWorkshopInSection,
+  sectionCompleted,
+  sectionStarted,
+} from './learning-progress.js';
 
 export function createShell({ i18n, progress, sections = [], onNavigate = () => {} }) {
   const skipLink = document.querySelector('.skip-link');
@@ -24,7 +22,7 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
   const progressMeter = element('progress', {
     className: 'progress-meter',
     max: sections.length,
-    value: completedCount(progress, sections),
+    value: completedSectionCount(sections, progress),
   });
   const progressBlock = element('div', { className: 'header-progress' }, [
     element('span', { className: 'status-mark', 'aria-hidden': 'true' }),
@@ -69,18 +67,22 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
     navigation.setAttribute('aria-label', i18n.t('nav.curriculum'));
     const heading = element('p', { className: 'sidebar-heading' }, [i18n.t('nav.curriculum')]);
     const list = element('ol', { className: 'curriculum-list' });
-    const firstPending = sections.findIndex((section) => !isSectionComplete(progress, section));
+    const firstPending = sections.findIndex((section) => !sectionCompleted(section, progress));
 
     sections.forEach((section, index) => {
-      const complete = isSectionComplete(progress, section);
+      const complete = sectionCompleted(section, progress);
+      const started = sectionStarted(section, progress);
       const current = !complete && index === (firstPending === -1 ? 0 : firstPending);
-      const stateKey = complete ? 'course.completed' : current ? 'course.next' : 'course.locked';
+      const stateKey = complete
+        ? 'course.completed'
+        : started ? 'course.inProgress' : current ? 'course.next' : 'course.locked';
+      const targetWorkshop = nextWorkshopInSection(section, progress) ?? section.workshops[0];
       const link = element('a', {
-        className: `curriculum-link${current ? ' is-current' : ''}${complete ? ' is-complete' : ''}`,
-        href: `#/workshops/${section.workshopId}`,
+        className: `curriculum-link${current ? ' is-current' : ''}${complete ? ' is-complete' : ''}${started && !complete ? ' is-started' : ''}`,
+        href: `#/workshops/${targetWorkshop}`,
         onClick: (event) => {
           event.preventDefault();
-          onNavigate(`/workshops/${section.workshopId}`);
+          onNavigate(`/workshops/${targetWorkshop}`);
         },
       }, [
         element('span', { className: 'curriculum-index', 'aria-hidden': 'true' }, [String(index + 1).padStart(2, '0')]),
@@ -97,7 +99,7 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
   }
 
   function renderChrome() {
-    const complete = completedCount(progress, sections);
+    const complete = completedSectionCount(sections, progress);
     document.documentElement.lang = i18n.locale;
     wordmark.textContent = i18n.t('app.name');
     wordmark.setAttribute('aria-label', i18n.t('home.backHome'));

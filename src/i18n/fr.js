@@ -26,6 +26,7 @@ export const fr = {
     method: 'Méthode',
     practice: 'À toi de jouer',
     completed: 'Terminé',
+    inProgress: 'En cours',
     next: 'À faire maintenant',
     locked: 'À venir',
     duration: '{minutes} min',
