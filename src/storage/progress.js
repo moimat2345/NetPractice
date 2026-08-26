@@ -23,22 +23,26 @@ function isRecord(value) {
  * that cannot be persisted. A clone is important because callers often keep
  * the previous state around for rendering or undoing a submission.
  */
-function cloneValue(value, seen = new WeakMap()) {
+function cloneValue(value, active = new WeakSet()) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value !== 'object') return undefined;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
-  if (seen.has(value)) return null;
-  seen.set(value, true);
+  if (active.has(value)) return null;
+  active.add(value);
 
-  if (Array.isArray(value)) return value.map((item) => cloneValue(item, seen) ?? null);
+  try {
+    if (Array.isArray(value)) return value.map((item) => cloneValue(item, active) ?? null);
 
-  const entries = [];
-  for (const [key, nestedValue] of Object.entries(value)) {
-    const nestedClone = cloneValue(nestedValue, seen);
-    if (nestedClone !== undefined) entries.push([key, nestedClone]);
+    const entries = [];
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const nestedClone = cloneValue(nestedValue, active);
+      if (nestedClone !== undefined) entries.push([key, nestedClone]);
+    }
+    return Object.fromEntries(entries);
+  } finally {
+    active.delete(value);
   }
-  return Object.fromEntries(entries);
 }
 
 function validSeconds(value) {

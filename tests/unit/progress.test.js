@@ -91,4 +91,25 @@ describe('progress storage', () => {
     expect(source.current.options.difficulty).toBe(2);
     expect(source.exams[0].details.missions).toEqual(['a']);
   });
+
+  it('preserves shared nested values while safely breaking genuine cycles', () => {
+    const shared = { label: 'same metadata', tags: ['range'] };
+    const result = { first: shared, second: shared };
+    const source = loadProgress(memoryStorage());
+    const next = completeWorkshop(source, 'shared-alias', result);
+
+    expect(next.completed['shared-alias'].first).toEqual(shared);
+    expect(next.completed['shared-alias'].second).toEqual(shared);
+    expect(next.completed['shared-alias'].first).not.toBe(shared);
+    expect(next.completed['shared-alias'].second).not.toBe(shared);
+    next.completed['shared-alias'].first.tags.push('changed');
+    expect(result.first.tags).toEqual(['range']);
+    expect(result.second.tags).toEqual(['range']);
+
+    const cycle = {};
+    cycle.self = cycle;
+    const cycled = recordExam(source, { passed: false, details: cycle });
+    expect(cycled.exams[0].details.self).toBeNull();
+    expect(cycle.self).toBe(cycle);
+  });
 });
