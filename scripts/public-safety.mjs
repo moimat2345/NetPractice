@@ -44,6 +44,30 @@ function throwUnsafeFilesystemEntries(paths) {
   throw new Error(`Unsafe public filesystem entries:\n${uniquePaths.join('\n')}`);
 }
 
+function directoryFingerprint(entry) {
+  return {
+    ctime: entry.ctimeNs ?? entry.ctimeMs,
+    device: entry.dev,
+    inode: entry.ino,
+    mode: entry.mode,
+    mtime: entry.mtimeNs ?? entry.mtimeMs,
+    links: entry.nlink,
+    size: entry.size,
+    type: entry.isDirectory() ? 'directory' : entry.isSymbolicLink() ? 'symlink' : 'other',
+  };
+}
+
+function sameDirectoryFingerprint(before, after) {
+  return before.ctime === after.ctime
+    && before.device === after.device
+    && before.inode === after.inode
+    && before.mode === after.mode
+    && before.mtime === after.mtime
+    && before.links === after.links
+    && before.size === after.size
+    && before.type === after.type;
+}
+
 export function listFilesRecursively(rootPath, operations = {}) {
   const root = resolve(rootPath);
   const inspect = operations.lstatSync ?? lstatSync;
@@ -53,7 +77,7 @@ export function listFilesRecursively(rootPath, operations = {}) {
 
   let rootEntry;
   try {
-    rootEntry = inspect(root);
+    rootEntry = inspect(root, { bigint: true });
   } catch (error) {
     if (error?.code === 'ENOENT') return [];
     throwUnsafeFilesystemEntries([basename(root)]);
@@ -77,10 +101,37 @@ export function listFilesRecursively(rootPath, operations = {}) {
       return;
     }
     if (entry.isDirectory()) {
+      let beforeEnumeration;
+      try {
+        beforeEnumeration = inspect(path, { bigint: true });
+      } catch {
+        unsafe.push(reportedPath(root, path));
+        return;
+      }
+      if (beforeEnumeration.isSymbolicLink() || !beforeEnumeration.isDirectory()) {
+        unsafe.push(reportedPath(root, path));
+        return;
+      }
       let names;
       try {
         names = list(path);
       } catch {
+        unsafe.push(reportedPath(root, path));
+        return;
+      }
+      let afterEnumeration;
+      try {
+        afterEnumeration = inspect(path, { bigint: true });
+      } catch {
+        unsafe.push(reportedPath(root, path));
+        return;
+      }
+      if (afterEnumeration.isSymbolicLink()
+        || !afterEnumeration.isDirectory()
+        || !sameDirectoryFingerprint(
+          directoryFingerprint(beforeEnumeration),
+          directoryFingerprint(afterEnumeration),
+        )) {
         unsafe.push(reportedPath(root, path));
         return;
       }

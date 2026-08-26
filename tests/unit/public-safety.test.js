@@ -3,10 +3,12 @@ import {
   lstatSync,
   mkdtempSync,
   mkdirSync,
+  readdirSync,
   renameSync,
   rmSync,
   symlinkSync,
   unlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -56,6 +58,32 @@ function raceFixture() {
     outside,
     parent,
   };
+}
+
+function forbiddenDiscoveryFixture(nested = false) {
+  const fixture = fixtureDirectory();
+  const root = join(fixture, 'public');
+  const directory = nested ? join(root, 'nested') : root;
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, 'index.html'),
+    '<script src="/net_practice/js/level10.js"></script>',
+  );
+  return { directory, fixture, root };
+}
+
+function replacementEnumeration(directory, fixture, restore) {
+  const saved = join(fixture, `saved-${directory.endsWith('nested') ? 'nested' : 'public'}`);
+  renameSync(directory, saved);
+  mkdirSync(directory);
+  const names = readdirSync(directory);
+  if (restore) {
+    rmSync(directory, { recursive: true });
+    renameSync(saved, directory);
+    const deterministicTime = new Date('2001-01-01T00:00:00.000Z');
+    utimesSync(directory, deterministicTime, deterministicTime);
+  }
+  return names;
 }
 
 afterEach(() => {
@@ -493,5 +521,81 @@ describe('assertPublicPathsSafe', () => {
       expect(message).not.toContain('must-not-leak');
       expect(message).not.toContain(fixture);
     }
+  });
+
+  it('rejects a root directory substitution left in place during discovery', () => {
+    const { fixture, root } = forbiddenDiscoveryFixture();
+
+    const message = errorMessage(() => listFilesRecursively(root, {
+      readdirSync(path) {
+        return replacementEnumeration(path, fixture, false);
+      },
+    }));
+
+    expect(message).toMatch(/public/);
+    expect(message).not.toContain('net_practice');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('rejects a root substitution restored before readdir returns', () => {
+    const { fixture, root } = forbiddenDiscoveryFixture();
+
+    const message = errorMessage(() => listFilesRecursively(root, {
+      readdirSync(path) {
+        return replacementEnumeration(path, fixture, true);
+      },
+    }));
+
+    expect(message).toMatch(/public/);
+    expect(message).not.toContain('net_practice');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('rejects a nested directory substitution left in place during discovery', () => {
+    const { directory, fixture, root } = forbiddenDiscoveryFixture(true);
+
+    const message = errorMessage(() => listFilesRecursively(root, {
+      readdirSync(path) {
+        return path === directory
+          ? replacementEnumeration(path, fixture, false)
+          : readdirSync(path);
+      },
+    }));
+
+    expect(message).toMatch(/nested/);
+    expect(message).not.toContain('net_practice');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('rejects a nested substitution restored before readdir returns', () => {
+    const { directory, fixture, root } = forbiddenDiscoveryFixture(true);
+
+    const message = errorMessage(() => listFilesRecursively(root, {
+      readdirSync(path) {
+        return path === directory
+          ? replacementEnumeration(path, fixture, true)
+          : readdirSync(path);
+      },
+    }));
+
+    expect(message).toMatch(/nested/);
+    expect(message).not.toContain('net_practice');
+    expect(message).not.toContain(fixture);
+  });
+
+  it('keeps stable empty and populated directory discovery unchanged', () => {
+    const fixture = fixtureDirectory();
+    const emptyRoot = join(fixture, 'empty');
+    const populatedRoot = join(fixture, 'public');
+    mkdirSync(emptyRoot);
+    mkdirSync(join(populatedRoot, 'assets'), { recursive: true });
+    writeFileSync(join(populatedRoot, 'index.html'), '<main>Safe</main>');
+    writeFileSync(join(populatedRoot, 'assets', 'app.js'), 'export const safe = true;');
+
+    expect(listFilesRecursively(emptyRoot)).toEqual([]);
+    expect(listFilesRecursively(populatedRoot).map((file) => file.relativePath)).toEqual([
+      'assets/app.js',
+      'index.html',
+    ]);
   });
 });
