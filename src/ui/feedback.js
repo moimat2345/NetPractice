@@ -35,16 +35,32 @@ export function correctionSteps(exercise) {
     destination: firstGoal.destinationId,
     returnSource: reverseGoal.sourceId,
     returnDestination: reverseGoal.destinationId,
+    expected: Object.entries(exercise.solution)
+      .map(([field, value]) => `${field}: ${value}`)
+      .join(' · '),
   };
-
-  return [
-    { key: 'correction.identify', params: values },
-    { key: 'correction.boundaries', params: values },
-    { key: 'correction.usable', params: values },
-    { key: 'correction.gateway', params: values },
-    { key: 'correction.forward', params: values },
-    { key: 'correction.return', params: values },
-  ];
+  const strategyKeys = {
+    'ipv4-format': ['correction.ipv4Shape', 'correction.octetBounds', 'correction.expectedFields'],
+    'octet-boundaries': ['correction.ipv4Shape', 'correction.octetBounds', 'correction.expectedFields'],
+    'mask-conversion': ['correction.maskBits', 'correction.octetBounds', 'correction.expectedFields'],
+    'subnet-boundaries': ['correction.identify', 'correction.boundaries', 'correction.expectedFields'],
+    'usable-hosts': ['correction.identify', 'correction.boundaries', 'correction.usable', 'correction.expectedFields'],
+    'compare-networks': ['correction.identify', 'correction.boundaries', 'correction.expectedFields'],
+    'switch-segment': ['correction.identify', 'correction.boundaries', 'correction.expectedFields'],
+    'connected-interface': ['correction.identify', 'correction.usable', 'correction.expectedFields'],
+    'gateway-membership': ['correction.identify', 'correction.boundaries', 'correction.gateway', 'correction.expectedFields'],
+    'connected-network': ['correction.identify', 'correction.boundaries', 'correction.expectedFields'],
+    'route-components': ['correction.identify', 'correction.gateway', 'correction.forward', 'correction.expectedFields'],
+    'default-route': ['correction.gateway', 'correction.defaultRoute', 'correction.forward', 'correction.expectedFields'],
+    'forward-trace': ['correction.gateway', 'correction.forward', 'correction.expectedFields'],
+    'return-trace': ['correction.forward', 'correction.return', 'correction.expectedFields'],
+    'packet-round-trip': ['correction.identify', 'correction.boundaries', 'correction.usable', 'correction.gateway', 'correction.forward', 'correction.return'],
+    'branch-round-trip': ['correction.identify', 'correction.gateway', 'correction.forward', 'correction.return', 'correction.expectedFields'],
+    'timed-round-trip': ['correction.identify', 'correction.gateway', 'correction.forward', 'correction.return', 'correction.expectedFields'],
+  };
+  const keys = strategyKeys[exercise.correctionStrategy]
+    ?? ['correction.identify', 'correction.boundaries', 'correction.expectedFields'];
+  return keys.map((key) => ({ key, params: values }));
 }
 
 export function renderDiagnostic(i18n, validation) {

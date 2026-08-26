@@ -3,6 +3,8 @@ import { getHint } from '../../src/exercises/hints.js';
 import { createI18n, flattenKeys } from '../../src/i18n/index.js';
 import { en } from '../../src/i18n/en.js';
 import { fr } from '../../src/i18n/fr.js';
+import { curriculum } from '../../src/content/curriculum.js';
+import { getWorkshopGenerator } from '../../src/exercises/generators.js';
 
 const taskSixDiagnosticKeys = [
   'diagnostic.invalid-ip',
@@ -116,6 +118,20 @@ describe('i18n', () => {
         Object.defineProperty(globalThis, 'document', documentDescriptor);
       } else {
         delete globalThis.document;
+      }
+    }
+  });
+
+  it('translates every device label emitted by the curriculum generators', () => {
+    const workshopIds = curriculum.flatMap((stage) => stage.workshops);
+    for (const locale of ['fr', 'en']) {
+      const i18n = createI18n(locale);
+      for (const id of workshopIds) {
+        const exercise = getWorkshopGenerator(id)({ seed: `labels-${id}` });
+        for (const device of exercise.devices) {
+          expect(() => i18n.t(device.labelKey)).not.toThrow();
+          expect(() => i18n.t(`device.${device.kind}`)).not.toThrow();
+        }
       }
     }
   });

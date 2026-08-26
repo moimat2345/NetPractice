@@ -35,7 +35,7 @@ for (const project of ['ultrawide', 'desktop', 'portrait']) {
     if (project === 'portrait') {
       await expect(page.locator('.curriculum-sidebar')).toBeHidden();
     }
-    await expect.poll(() => linkMetrics(page)).toHaveLength(5);
+    await expect.poll(() => linkMetrics(page)).toHaveLength(6);
     expect((await linkMetrics(page)).every((link) =>
       link.attributeStart <= 1
       && link.attributeEnd <= 1
@@ -47,7 +47,7 @@ for (const project of ['ultrawide', 'desktop', 'portrait']) {
 test('recomputes attached endpoints after resizing the same page', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.goto(missionUrl);
-  await expect.poll(() => linkMetrics(page)).toHaveLength(5);
+  await expect.poll(() => linkMetrics(page)).toHaveLength(6);
 
   await page.setViewportSize({ width: 1024, height: 1000 });
   await expect.poll(async () => (await linkMetrics(page)).every((link) =>
@@ -111,7 +111,7 @@ test('does not enqueue link work after the topology is destroyed', async ({ page
     };
   });
   await page.goto(missionUrl);
-  await expect.poll(() => linkMetrics(page)).toHaveLength(5);
+  await expect.poll(() => linkMetrics(page)).toHaveLength(6);
 
   await page.evaluate(() => {
     location.hash = '#/';
@@ -133,7 +133,7 @@ test('uses a packet-ordered stacked list without horizontal overflow on mobile',
   await expect(page.locator('[data-topology] svg')).toBeHidden();
   const deviceOrder = await page.locator('[data-device-id]').evaluateAll((nodes) =>
     nodes.map((node) => node.dataset.deviceId));
-  expect(deviceOrder).toEqual(['internet', 'atlas', 'orme', 'alpha', 'boreal', 'beta']);
+  expect(deviceOrder).toEqual(['internet', 'atlas', 'orme', 'alpha', 'gamma', 'boreal', 'beta']);
   await page.getByRole('button', { name: /alpha/i }).first().click();
   const controlMetrics = await page.locator('[data-device-config="alpha"] input').first().evaluate((input) => {
     const style = getComputedStyle(input);

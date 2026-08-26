@@ -1,5 +1,7 @@
 import { formatIPv4 } from '../core/ipv4.js';
-import { generateFocusedExercise, generateMission } from '../exercises/generators.js';
+import { lessonsEn } from '../content/lessons.en.js';
+import { lessonsFr } from '../content/lessons.fr.js';
+import { getWorkshopGenerator } from '../exercises/generators.js';
 import { getHint } from '../exercises/hints.js';
 import { validateSubmission } from '../exercises/validators.js';
 import { renderDeviceConfig } from './device-config.js';
@@ -8,16 +10,23 @@ import { renderCorrection, renderDiagnostic, renderHint } from './feedback.js';
 import { createTopology } from './topology.js';
 
 function makeExercise(definition, seed) {
-  if (definition.concept === 'routing-mission') {
-    return generateMission({ seed, difficulty: definition.difficulty });
-  }
-  return generateFocusedExercise({ seed, concept: definition.concept, difficulty: definition.difficulty });
+  const generate = getWorkshopGenerator(definition.id);
+  if (!generate) throw new RangeError(`No generator for workshop: ${definition.id}`);
+  return generate({ seed });
+}
+
+function workshopLesson(locale, workshopId) {
+  const lessons = locale === 'en' ? lessonsEn : lessonsFr;
+  const lesson = lessons[workshopId];
+  if (!lesson) throw new RangeError(`No ${locale} lesson for workshop: ${workshopId}`);
+  return lesson;
 }
 
 function fieldLabelKey(field, meta) {
   const role = meta?.role;
   const keys = {
     network: 'field.network',
+    'direct-network': 'field.network',
     broadcast: 'field.broadcast',
     'first-host': 'field.firstHost',
     'last-host': 'field.lastHost',
@@ -34,9 +43,13 @@ function fieldLabelKey(field, meta) {
 }
 
 function exerciseClue(exercise) {
+  if (typeof exercise.facts?.clue === 'string') return exercise.facts.clue;
   const networkInterface = exercise.devices
     .flatMap((device) => device.interfaces)
-    .find((entry) => Number.isInteger(entry.address) && Number.isInteger(entry.prefix));
+    .find((entry) => Number.isInteger(entry.address)
+      && Number.isInteger(entry.prefix)
+      && !entry.editable.address
+      && !entry.editable.prefix);
   if (!networkInterface) return '—';
   return `${formatIPv4(networkInterface.address)}/${networkInterface.prefix}`;
 }
@@ -175,11 +188,20 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
     root.dataset.exerciseSeed = state.seed;
     root.dataset.workshopPhase = state.phase;
     const hint = state.hintLevel > 0 ? getHint(exercise, state.validation, state.hintLevel) : null;
-    const lesson = element('section', { className: 'workshop-lesson', 'aria-labelledby': 'workshop-title' }, [
+    const lessonContent = workshopLesson(i18n.locale, definition.id);
+    const lesson = element('section', {
+      className: 'workshop-lesson',
+      'aria-labelledby': 'workshop-title',
+      'data-workshop-lesson': definition.id,
+    }, [
       element('div', {}, [
         element('p', { className: 'eyebrow' }, [i18n.t(`course.${definition.stageId}.eyebrow`)]),
-        element('h1', { id: 'workshop-title' }, [i18n.t(definition.titleKey)]),
-        element('p', { className: 'workshop-intro' }, [i18n.t(`course.${definition.stageId}.lesson`)]),
+        element('h1', { id: 'workshop-title' }, [lessonContent.title]),
+        element('p', { className: 'workshop-intro' }, [lessonContent.microLesson]),
+        element('p', { className: 'note-label' }, [i18n.t('course.method')]),
+        element('ol', { className: 'workshop-method' }, lessonContent.methodSteps.map((step) =>
+          element('li', {}, [step]))),
+        element('p', { className: 'workshop-readiness' }, [lessonContent.readinessLabel]),
       ]),
       element('aside', { className: 'exercise-note' }, [
         element('span', {}, [i18n.t('course.practice')]),
@@ -207,7 +229,7 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
     }, [
       element('div', { className: 'workshop-form-heading' }, [
         element('p', { className: 'note-label' }, [i18n.t('course.objective')]),
-        element('h2', {}, [i18n.t(`course.${definition.stageId}.objective`)]),
+        element('h2', {}, [lessonContent.objective]),
       ]),
       topologyController.element,
       renderDeviceConfig({

@@ -50,6 +50,34 @@ test('keeps the active attempt intact while switching language', async ({ page }
   await expect(page.getByRole('button', { name: /hint 2/i })).toBeVisible();
 });
 
+test('renders the workshop lesson module and translates it without losing focus', async ({ page }) => {
+  await page.goto('/#/workshops/subnet-range-1?seed=lesson-module');
+
+  const lesson = page.locator('[data-workshop-lesson="subnet-range-1"]');
+  await expect(lesson.getByRole('heading', { level: 1 })).toHaveText('Trouve les limites du réseau');
+  await expect(lesson).toContainText('blocs de 32');
+  await expect(lesson.getByRole('listitem')).toHaveCount(3);
+  await expect(lesson).toContainText('Prêt à borner un sous-réseau');
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText('Calcule les adresses réseau et de diffusion du bloc.');
+
+  const field = page.getByLabel(/adresse réseau/i);
+  await field.fill('10.20.30.40');
+  await field.focus();
+  await field.evaluate((input) => input.setSelectionRange(3, 8));
+  await page.getByRole('button', { name: 'EN' }).evaluate((button) => button.click());
+
+  await expect(lesson.getByRole('heading', { level: 1 })).toHaveText('Find the subnet boundaries');
+  await expect(lesson).toContainText('blocks of 32');
+  await expect(lesson).toContainText('Ready to bound a subnet');
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText('Calculate the network and broadcast addresses of the block.');
+  await expect(page.getByLabel(/network address/i)).toHaveValue('10.20.30.40');
+  await expect(page.getByLabel(/network address/i)).toBeFocused();
+  await expect.poll(async () => page.getByLabel(/network address/i).evaluate((input) => ({
+    start: input.selectionStart,
+    end: input.selectionEnd,
+  }))).toEqual({ start: 3, end: 8 });
+});
+
 test('recreates a workshop when only its route seed changes', async ({ page }) => {
   await page.goto('/#/workshops/subnet-range-1?seed=route-seed-a');
   const field = page.getByLabel(/adresse réseau/i);
@@ -66,6 +94,7 @@ test('recreates a workshop when only its route seed changes', async ({ page }) =
 test('records a successful attempt and refreshes the shell progress', async ({ page }) => {
   await page.goto('/#/workshops/subnet-range-1?seed=e2e-success');
   await page.getByLabel(/adresse réseau/i).fill('10.195.32.0');
+  await page.getByLabel(/adresse de diffusion/i).fill('10.195.32.63');
   await page.getByRole('button', { name: /tester le réseau/i }).click();
 
   await expect(page.locator('[data-workshop-phase="correct"]')).toBeVisible();
