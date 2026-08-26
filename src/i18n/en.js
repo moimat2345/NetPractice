@@ -276,6 +276,7 @@ export const en = {
     statusPending: 'Pending',
     statusPassed: 'Passed',
     completed: 'All three missions are validated.',
+    resultAnnouncement: 'Mock exam result available.',
     practiceAgain: 'Suggested workshops:',
     timeRemaining: 'Time remaining: {minutes}:{seconds}',
     missionsRemaining: '{count} mission remaining',

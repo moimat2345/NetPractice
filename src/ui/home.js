@@ -1,5 +1,12 @@
 import { element } from './dom.js';
 
+let examAttemptCounter = 0;
+
+function createExamAttemptSeed() {
+  examAttemptCounter += 1;
+  return `mock-${Date.now().toString(36)}-${examAttemptCounter.toString(36)}`;
+}
+
 function isComplete(progress, workshopId) {
   return Boolean(progress?.completed?.[workshopId]);
 }
@@ -17,6 +24,7 @@ function routeLink(label, route, className, onNavigate) {
 
 export function renderHome({ i18n, progress, sections = [], onNavigate = () => {} }) {
   const firstPending = sections.find((section) => !isComplete(progress, section.workshopId)) ?? sections[0];
+  const examAttemptSeed = createExamAttemptSeed();
   const home = element('div', { className: 'home-view' });
   const heroCopy = element('div', { className: 'hero-copy' }, [
     element('p', { className: 'eyebrow' }, [i18n.t('course.eyebrow')]),
@@ -56,12 +64,20 @@ export function renderHome({ i18n, progress, sections = [], onNavigate = () => {
         element('h3', {}, [i18n.t(section.titleKey)]),
         element('p', {}, [i18n.t(section.summaryKey)]),
       ]),
-      routeLink(
-        i18n.t(current ? 'action.continue' : 'home.openStage'),
-        `/workshops/${section.workshopId}`,
-        'ledger-link',
-        onNavigate,
-      ),
+      element('div', { className: 'ledger-actions' }, [
+        routeLink(
+          i18n.t(current ? 'action.continue' : 'home.openStage'),
+          `/workshops/${section.workshopId}`,
+          'ledger-link',
+          onNavigate,
+        ),
+        section.id === 'exam' && routeLink(
+          i18n.t('action.startExam'),
+          `/exam?seed=${encodeURIComponent(examAttemptSeed)}`,
+          'ledger-link ledger-exam-link',
+          onNavigate,
+        ),
+      ]),
     ]));
   });
 

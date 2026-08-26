@@ -46,7 +46,24 @@ function cloneValue(value, active = new WeakSet()) {
 }
 
 function validSeconds(value) {
-  return Number.isInteger(value) && value >= 0;
+  return Number.isInteger(value) && value >= 0 && value <= 900;
+}
+
+function isFullyPassedExam(exam) {
+  return isRecord(exam)
+    && typeof exam.id === 'string'
+    && exam.id === `exam:${exam.seed}`
+    && exam.status === 'complete'
+    && exam.passed === true
+    && exam.score === 3
+    && validSeconds(exam.seconds)
+    && Array.isArray(exam.missions)
+    && exam.missions.length === 3
+    && exam.missions.every((mission) => isRecord(mission)
+      && mission.passed === true
+      && typeof mission.missionSeed === 'string'
+      && mission.missionSeed.length > 0
+      && Array.isArray(mission.diagnosticCodes));
 }
 
 function cloneRecordMap(value) {
@@ -71,7 +88,7 @@ function cloneExams(value) {
 
 function bestFromExams(exams) {
   const passedTimes = exams
-    .filter((exam) => exam.passed === true && exam.score === 3 && validSeconds(exam.seconds))
+    .filter(isFullyPassedExam)
     .map((exam) => exam.seconds);
   return passedTimes.length > 0 ? Math.min(...passedTimes) : null;
 }
@@ -151,7 +168,7 @@ export function recordExam(progress, result) {
   }
   next.exams = [...next.exams, exam];
 
-  if (exam.passed === true && exam.score === 3 && validSeconds(exam.seconds)) {
+  if (isFullyPassedExam(exam)) {
     next.bestExamSeconds = next.bestExamSeconds === null
       ? exam.seconds
       : Math.min(next.bestExamSeconds, exam.seconds);

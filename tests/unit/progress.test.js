@@ -10,6 +10,22 @@ function memoryStorage(initial = null) {
   };
 }
 
+function passedExam(id, seconds) {
+  return {
+    id,
+    seed: id.replace(/^exam:/, ''),
+    passed: true,
+    seconds,
+    score: 3,
+    status: 'complete',
+    missions: [0, 1, 2].map((index) => ({
+      missionSeed: `${id}:${index}`,
+      passed: true,
+      diagnosticCodes: [],
+    })),
+  };
+}
+
 describe('progress storage', () => {
   it('recovers from missing, corrupted, wrong-shaped, and future-version data', () => {
     const expected = { version: 1, locale: 'fr', completed: {}, current: null, exams: [], bestExamSeconds: null };
@@ -37,7 +53,7 @@ describe('progress storage', () => {
       locale: 'en',
       completed: { 'subnet-1': { attempts: 2, hints: 1 } },
       current: { id: 'subnet-1', seed: 'seed-a' },
-      exams: [{ passed: true, seconds: 780, score: 3 }],
+      exams: [passedExam('exam:round-trip', 780)],
       bestExamSeconds: 780,
     };
 
@@ -50,10 +66,10 @@ describe('progress storage', () => {
     const initial = loadProgress(memoryStorage());
     const result = { attempts: 2, hints: 1, diagnostics: [{ code: 'network-address' }] };
     const completed = completeWorkshop(initial, 'subnet-1', result);
-    const firstExam = recordExam(completed, { passed: true, seconds: 780, score: 3 });
+    const firstExam = recordExam(completed, passedExam('exam:first', 780));
     const failedExam = recordExam(firstExam, { passed: false, seconds: 400, score: 0 });
-    const slowerExam = recordExam(failedExam, { passed: true, seconds: 900, score: 3 });
-    const fasterExam = recordExam(slowerExam, { passed: true, seconds: 690, score: 3 });
+    const slowerExam = recordExam(failedExam, passedExam('exam:slower', 900));
+    const fasterExam = recordExam(slowerExam, passedExam('exam:faster', 690));
 
     expect(initial).toEqual({ version: 1, locale: 'fr', completed: {}, current: null, exams: [], bestExamSeconds: null });
     expect(result).toEqual({ attempts: 2, hints: 1, diagnostics: [{ code: 'network-address' }] });
@@ -68,10 +84,10 @@ describe('progress storage', () => {
   it('records a finalized exam id once and updates best time only for a full pass', () => {
     const initial = loadProgress(memoryStorage());
     const expired = recordExam(initial, { id: 'exam:reload', passed: false, seconds: 900, score: 2 });
-    const duplicate = recordExam(expired, { id: 'exam:reload', passed: true, seconds: 100, score: 3 });
+    const duplicate = recordExam(expired, passedExam('exam:reload', 100));
     const partial = recordExam(duplicate, { id: 'exam:partial', passed: false, seconds: 200, score: 2 });
     const inconsistent = recordExam(partial, { id: 'exam:inconsistent', passed: true, seconds: 100, score: 2 });
-    const passed = recordExam(inconsistent, { id: 'exam:passed', passed: true, seconds: 640, score: 3 });
+    const passed = recordExam(inconsistent, passedExam('exam:passed', 640));
 
     expect(duplicate.exams).toEqual(expired.exams);
     expect(partial.bestExamSeconds).toBeNull();
@@ -87,6 +103,36 @@ describe('progress storage', () => {
       bestExamSeconds: 100,
     })));
     expect(inconsistentStored.bestExamSeconds).toBeNull();
+  });
+
+  it('rejects structurally corrupted complete-looking records from best-time calculations', () => {
+    const corrupted = {
+      id: 'exam:corrupted',
+      passed: true,
+      score: 3,
+      status: 'expired',
+      seconds: 7,
+      missions: [],
+    };
+    const emptyComplete = {
+      ...corrupted,
+      id: 'exam:empty-complete',
+      seed: 'empty-complete',
+      status: 'complete',
+    };
+    const recorded = recordExam(recordExam(loadProgress(memoryStorage()), corrupted), emptyComplete);
+    const stored = loadProgress(memoryStorage(JSON.stringify({
+      version: 1,
+      locale: 'fr',
+      completed: {},
+      exams: [corrupted, emptyComplete, passedExam('exam:valid', 640)],
+      bestExamSeconds: 7,
+    })));
+
+    expect(recorded.exams).toContainEqual(corrupted);
+    expect(recorded.exams).toContainEqual(emptyComplete);
+    expect(recorded.bestExamSeconds).toBeNull();
+    expect(stored.bestExamSeconds).toBe(640);
   });
 
   it('detaches nested progress data from caller-owned objects', () => {

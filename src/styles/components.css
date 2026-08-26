@@ -339,6 +339,19 @@
   color: var(--ink);
 }
 
+.ledger-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+}
+
+.ledger-exam-link {
+  border: 1px solid var(--accent);
+  text-decoration: none;
+}
+
 @media (max-width: 560px) {
   .method-note {
     padding-right: 1rem;
@@ -359,6 +372,11 @@
     width: max-content;
     margin-top: 0.4rem;
     padding-left: 0;
+  }
+
+  .ledger-actions {
+    align-items: flex-start;
+    justify-content: flex-start;
     grid-column: 2;
   }
 }

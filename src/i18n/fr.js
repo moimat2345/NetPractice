@@ -276,6 +276,7 @@ export const fr = {
     statusPending: 'À faire',
     statusPassed: 'Réussie',
     completed: 'Les trois missions sont validées.',
+    resultAnnouncement: 'Résultat de l’évaluation disponible.',
     practiceAgain: 'Ateliers conseillés :',
     timeRemaining: 'Temps restant : {minutes}:{seconds}',
     missionsRemaining: '{count} mission restante',

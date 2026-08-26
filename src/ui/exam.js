@@ -21,6 +21,40 @@ function immutableCopy(value) {
   return deepFreeze(structuredClone(value));
 }
 
+function captureFocus(root) {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || !root.contains(active) || !active.dataset.focusKey) return null;
+  const snapshot = { key: active.dataset.focusKey, selection: null };
+  if (active instanceof HTMLInputElement) {
+    snapshot.selection = {
+      start: active.selectionStart,
+      end: active.selectionEnd,
+      direction: active.selectionDirection,
+    };
+  }
+  return snapshot;
+}
+
+function restoreFocus(root, snapshot) {
+  if (!snapshot) return false;
+  const target = [...root.querySelectorAll('[data-focus-key]')]
+    .find((node) => node.dataset.focusKey === snapshot.key);
+  if (!(target instanceof HTMLElement)) return false;
+  target.focus({ preventScroll: true });
+  if (target instanceof HTMLInputElement && snapshot.selection) {
+    try {
+      target.setSelectionRange(
+        snapshot.selection.start,
+        snapshot.selection.end,
+        snapshot.selection.direction,
+      );
+    } catch {
+      // Focus continuity still applies to controls without text selection.
+    }
+  }
+  return true;
+}
+
 function diagnosticCodes(validation) {
   const codes = validation?.diagnostics
     ?.map((diagnostic) => diagnostic?.code)
@@ -245,6 +279,7 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
         type: 'button',
         'aria-current': index === snapshot.index ? 'step' : null,
         'data-mission-status': missionStatus,
+        'data-focus-key': `exam:mission:${index}`,
         disabled: snapshot.status !== 'running' || result?.passed === true,
         onClick: () => {
           if (!state.select(index)) return;
@@ -298,7 +333,11 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
         onChange: (field, value) => state.update(field, value),
       }),
       element('div', { className: 'workshop-actions' }, [
-        element('button', { className: 'button button-primary', type: 'submit' }, [i18n.t('action.submitMission')]),
+        element('button', {
+          className: 'button button-primary',
+          type: 'submit',
+          'data-focus-key': 'exam:submit',
+        }, [i18n.t('action.submitMission')]),
       ]),
     ]);
     return form;
@@ -307,7 +346,11 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
   function renderResults(snapshot) {
     return element('section', { className: 'exam-results', 'aria-labelledby': 'exam-result-title' }, [
       element('p', { className: 'eyebrow' }, [i18n.t(snapshot.status === 'complete' ? 'exam.completed' : 'exam.expired')]),
-      element('h2', { id: 'exam-result-title' }, [i18n.t('result.title')]),
+      element('h2', {
+        id: 'exam-result-title',
+        tabindex: '-1',
+        'data-focus-key': 'exam:result',
+      }, [i18n.t('result.title')]),
       element('div', { className: 'exam-result-overview' }, [
         element('strong', {}, [i18n.t('result.score', {
           score: snapshot.results.filter((result) => result.passed).length,
@@ -323,6 +366,8 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
 
   function render() {
     if (destroyed) return;
+    const previousStatus = renderedStatus;
+    const focusSnapshot = captureFocus(root);
     topologyController?.destroy();
     topologyController = null;
     const snapshot = state.snapshot();
@@ -330,7 +375,11 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
     root.dataset.activeMission = String(snapshot.index);
     renderedStatus = snapshot.status;
     timerText = element('strong', { className: 'exam-timer-value' }, [formatTime(snapshot.remainingSeconds)]);
-    liveRegion = element('div', { className: 'visually-hidden', 'aria-live': 'polite', 'aria-atomic': 'true' });
+    liveRegion = element('div', {
+      className: 'visually-hidden',
+      'aria-live': 'polite',
+      'aria-atomic': 'true',
+    }, snapshot.status === 'running' ? [] : [i18n.t('exam.resultAnnouncement')]);
     const header = element('header', { className: 'exam-header' }, [
       element('div', {}, [
         element('p', { className: 'eyebrow' }, [i18n.t('course.exam.eyebrow')]),
@@ -352,6 +401,12 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
       snapshot.status === 'running' && renderNavigation(snapshot),
       snapshot.status === 'running' ? renderRunning(snapshot) : renderResults(snapshot),
     ]);
+    const finalizedNow = previousStatus === 'running' && snapshot.status !== 'running';
+    if (finalizedNow) {
+      root.querySelector('[data-focus-key="exam:result"]')?.focus({ preventScroll: true });
+    } else {
+      restoreFocus(root, focusSnapshot);
+    }
     if (snapshot.status !== 'running' && interval !== null) {
       clearInterval(interval);
       interval = null;
