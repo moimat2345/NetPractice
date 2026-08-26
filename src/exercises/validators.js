@@ -253,11 +253,7 @@ function validateRouteDestinations(exercise, topology) {
     const expectedDestination = parseIPv4(exercise.solution[destinationField]);
     const expectedPrefix = exercise.fieldMeta?.[destinationField]?.prefix;
     if (expectedDestination === null || !Number.isInteger(expectedPrefix) || !route) continue;
-    const intendedEndpoint = topology.devices
-      .flatMap((candidate) => candidate.interfaces)
-      .find((entry) => Number.isInteger(entry.address)
-        && networkOf(entry.address, expectedPrefix) === expectedDestination);
-    if (intendedEndpoint && networkOf(intendedEndpoint.address, route.prefix) !== route.destination) {
+    if (route.destination !== expectedDestination || route.prefix !== expectedPrefix) {
       diagnostics.push(diagnostic('wrong-route-destination', {
         deviceId: device.id,
         field: route.destination !== expectedDestination ? destinationField : prefixField,

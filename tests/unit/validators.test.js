@@ -200,4 +200,21 @@ describe('topology diagnostics', () => {
         expect.objectContaining({ code: 'wrong-route-destination', field }),
       ]) });
   });
+
+  it.each(['/24', '/28'])('rejects an aligned %s route prefix even when it still covers the remote endpoint', (prefix) => {
+    const exercise = generateMission({ seed: 'destination-prefix-1', difficulty: 3 });
+    const field = exercise.editableFields.find((candidate) => candidate.endsWith('atlas-lan-b.prefix'));
+
+    expect(validateSubmission(exercise, { ...validSubmission(exercise), [field]: prefix }))
+      .toMatchObject({
+        ok: false,
+        diagnostics: expect.arrayContaining([
+          expect.objectContaining({
+            code: 'wrong-route-destination',
+            field,
+            params: expect.objectContaining({ prefix: Number(prefix.slice(1)) }),
+          }),
+        ]),
+      });
+  });
 });
