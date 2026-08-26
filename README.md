@@ -76,7 +76,7 @@ The application has no accounts, analytics, advertising, remote database, or lea
 
 Subnet Notes is an unofficial community resource and is not affiliated with, endorsed by, or maintained by 42.
 
-The official NetPractice simulator directory, subject PDF, and level data are deliberately excluded because their license forbids redistribution. No official content was used to generate the lessons, exercises, diagrams, fixtures, or solutions shipped here; all published learning material and network configurations are original.
+The official NetPractice simulator directory, subject PDF, and level data are deliberately excluded because their license forbids redistribution. No official assets, solutions, or level data were copied or used as generator fixtures. The public subject and evaluation requirements informed the project's scope; all published lessons, exercises, diagrams, and network configurations are original.
 
 This repository currently contains no standalone `LICENSE` file. Do not assume that the source code is open source: review the repository's licensing status and obtain any required permission before copying, modifying, or redistributing it.
 

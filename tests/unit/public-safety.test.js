@@ -83,4 +83,98 @@ describe('assertPublicPathsSafe', () => {
     expect(() => assertExecutableReferencesSafe(listFilesRecursively(root)))
       .toThrowError(/index\.html/);
   });
+
+  it.each([
+    [
+      'quoted hexadecimal HTML entity',
+      'entity.html',
+      '<script src="/&#x6e;et_practice/js/level10.js"></script>',
+    ],
+    [
+      'quoted decimal HTML entity',
+      'decimal-entity.html',
+      '<script src="/&#110;et_practice/js/level10.js"></script>',
+    ],
+    [
+      'unquoted HTML attribute',
+      'unquoted.html',
+      '<script src=/net_practice/js/level10.js></script>',
+    ],
+    [
+      'percent encoding with query and fragment',
+      'percent.html',
+      '<script src="/%6eet_practice/js/level10.js?cache=1&amp;mode=test#release"></script>',
+    ],
+    [
+      'double percent encoding',
+      'double-percent.html',
+      '<script src="/%256eet_practice/js/level10.js"></script>',
+    ],
+    [
+      'encoded separator and path traversal',
+      'separator.html',
+      '<script src="/assets/..%2fnet_practice%2fjs%2flevel10.js"></script>',
+    ],
+    [
+      'backslash path separators',
+      'backslash.html',
+      '<script src="\\\\net_practice\\\\js\\\\level10.js"></script>',
+    ],
+    [
+      'encoded official subject link',
+      'subject.html',
+      '<a href="/en.subject%20_netpractice.pdf?download=1">subject</a>',
+    ],
+    [
+      'CSS escaped import',
+      'escaped.css',
+      '@import "/\\6e et_practice/theme.css";',
+    ],
+    [
+      'double-encoded CSS URL',
+      'encoded.css',
+      '.lesson { background: url("/%256eet_practice/art.png#card"); }',
+    ],
+    [
+      'JavaScript hexadecimal escape',
+      'static.mjs',
+      'im' + 'port "/\\x6eet_practice/js/level10.js";',
+    ],
+    [
+      'JavaScript Unicode escape',
+      'dynamic.js',
+      'im' + 'port("/\\u006eet_practice/js/level10.js?mode=test");',
+    ],
+    [
+      'double-encoded new URL reference',
+      'url.js',
+      'new ' + 'URL("/%256eet_practice/js/level10.js", import.meta.url);',
+    ],
+  ])('rejects %s and reports only its file name', (_case, fileName, content) => {
+    const root = fixtureDirectory();
+    writeFileSync(join(root, fileName), content);
+
+    let message = '';
+    try {
+      assertExecutableReferencesSafe(listFilesRecursively(root));
+    } catch (error) {
+      message = error.message;
+    }
+
+    expect(message).toMatch(new RegExp(fileName.replace('.', '\\.')));
+    expect(message).not.toContain('level10.js');
+    expect(message).not.toContain('download=1');
+  });
+
+  it('tolerates malformed encodings and keeps clean references safe', () => {
+    const root = fixtureDirectory();
+    writeFileSync(join(root, 'index.html'), [
+      '<script src="/assets/app.js?next=%E0%A4%A"></script>',
+      '<a href="/guides/networking.html#net_practice-explained">Guide</a>',
+    ].join('\n'));
+    writeFileSync(join(root, 'theme.css'), '@import url("/assets/theme.css");');
+    writeFileSync(join(root, 'app.js'), 'im' + 'port("/assets/module.js");');
+
+    expect(() => assertExecutableReferencesSafe(listFilesRecursively(root))).not.toThrow();
+  });
 });

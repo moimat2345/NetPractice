@@ -42,26 +42,104 @@ export function listFilesRecursively(rootPath) {
   return files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 }
 
+function decodedCodePoint(raw, fallback) {
+  const value = Number.parseInt(raw, fallback);
+  if (!Number.isInteger(value) || value < 0 || value > 0x10ffff) return null;
+  try {
+    return String.fromCodePoint(value);
+  } catch {
+    return null;
+  }
+}
+
+function decodeHtmlCharacterReferences(value) {
+  return value
+    .replace(/&#(?:x([0-9a-f]{1,6})|([0-9]{1,7}));?/gi, (match, hex, decimal) =>
+      decodedCodePoint(hex ?? decimal, hex ? 16 : 10) ?? match)
+    .replace(/&amp;/gi, '&');
+}
+
+function decodeCssEscapes(value) {
+  return value
+    .replace(/\\([0-9a-f]{1,6})(?:\r\n|[\t\n\f\r ])?/gi, (match, hex) =>
+      decodedCodePoint(hex, 16) ?? match)
+    .replace(/\\(?:\r\n|[\n\f\r])/g, '')
+    .replace(/\\([^\n\f\r])/g, '$1');
+}
+
+function decodeJavaScriptEscapes(value) {
+  return value
+    .replace(/\\x([0-9a-f]{2})/gi, (match, hex) => decodedCodePoint(hex, 16) ?? match)
+    .replace(/\\u\{([0-9a-f]{1,6})\}/gi, (match, hex) => decodedCodePoint(hex, 16) ?? match)
+    .replace(/\\u([0-9a-f]{4})/gi, (match, hex) => decodedCodePoint(hex, 16) ?? match)
+    .replace(/\\(?:\r\n|[\n\r])/g, '')
+    .replace(/\\(["'`\\/])/g, '$1');
+}
+
+function decodePercentEscapes(value) {
+  let decoded = value;
+  for (let iteration = 0; iteration < 4; iteration += 1) {
+    const next = decoded.replace(/%([0-9a-f]{2})/gi, (_match, hex) =>
+      String.fromCharCode(Number.parseInt(hex, 16)));
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return decoded;
+}
+
+function firstDefined(values) {
+  return values.find((value) => value !== undefined) ?? '';
+}
+
 function executableReferences(text, extension) {
-  const patterns = [];
+  const references = [];
   if (['.html', '.svg', '.xml'].includes(extension)) {
-    patterns.push(/\b(?:href|src)\s*=\s*["']([^"']+)["']/gi);
+    const attributes = /\b(src|href|srcset|action|formaction|poster|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'`=<>]+))/gi;
+    for (const match of text.matchAll(attributes)) {
+      const values = match[1].toLowerCase() === 'srcset'
+        ? firstDefined(match.slice(2)).split(',').map((candidate) => candidate.trim().split(/\s+/, 1)[0])
+        : [firstDefined(match.slice(2))];
+      values.filter(Boolean).forEach((value) => references.push({ syntax: 'html', value }));
+    }
   }
   if (extension === '.css') {
-    patterns.push(/@import\s+(?:url\()?\s*["']?([^"')\s;]+)["']?/gi);
-    patterns.push(/url\(\s*["']?([^"')]+)["']?\s*\)/gi);
+    const patterns = [
+      /@import\s+(?:url\(\s*)?(?:"((?:\\[\s\S]|[^"])*)"|'((?:\\[\s\S]|[^'])*)'|([^"')\s;]+))/gi,
+      /url\(\s*(?:"((?:\\[\s\S]|[^"])*)"|'((?:\\[\s\S]|[^'])*)'|([^"')\s]+))\s*\)/gi,
+    ];
+    patterns.forEach((pattern) => {
+      for (const match of text.matchAll(pattern)) {
+        references.push({ syntax: 'css', value: firstDefined(match.slice(1)) });
+      }
+    });
   }
   if (['.js', '.mjs'].includes(extension)) {
-    patterns.push(/\b(?:import|export)\s+(?:[\s\S]*?\sfrom\s*)?["']([^"']+)["']/g);
-    patterns.push(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g);
-    patterns.push(/\bnew\s+URL\s*\(\s*["']([^"']+)["']/g);
+    const patterns = [
+      /\b(?:import|export)\s+(?:[\s\S]*?\sfrom\s*)?["']((?:\\.|[^"'])+)["']/g,
+      /\bimport\s*\(\s*["']((?:\\.|[^"'])+)["']\s*\)/g,
+      /\bnew\s+URL\s*\(\s*["']((?:\\.|[^"'])+)["']/g,
+    ];
+    patterns.forEach((pattern) => {
+      for (const match of text.matchAll(pattern)) references.push({ syntax: 'javascript', value: match[1] });
+    });
   }
 
-  return patterns.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[1]));
+  return references;
+}
+
+function normalizedReference(reference) {
+  let normalized = String(reference.value);
+  if (reference.syntax === 'html') normalized = decodeHtmlCharacterReferences(normalized);
+  if (reference.syntax === 'css') normalized = decodeCssEscapes(normalized);
+  if (reference.syntax === 'javascript') normalized = decodeJavaScriptEscapes(normalized);
+  normalized = decodePercentEscapes(normalized)
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replaceAll('\\', '/');
+  return normalized.split(/[?#]/, 1)[0];
 }
 
 function isForbiddenReference(reference) {
-  const normalized = String(reference).split(/[?#]/, 1)[0].replaceAll('\\', '/');
+  const normalized = normalizedReference(reference);
   return /(^|\/)net_practice(\/|$)/.test(normalized)
     || /(^|\/)en\.subject _netpractice\.pdf$/.test(normalized);
 }
