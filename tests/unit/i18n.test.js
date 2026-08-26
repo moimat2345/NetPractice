@@ -73,4 +73,50 @@ describe('i18n', () => {
     expect(i18n.t('diagnostic.invalid-ip', { value: '$&{name}' })).toContain('$&{name}');
     expect(i18n.t('action.hint')).toContain('{level}');
   });
+
+  it('falls back from inherited and unknown locale names', () => {
+    expect(createI18n('toString').locale).toBe('fr');
+    expect(createI18n('not-a-locale').locale).toBe('fr');
+
+    const i18n = createI18n('fr');
+    i18n.setLocale('toString');
+    i18n.setLocale('not-a-locale');
+
+    expect(i18n.locale).toBe('fr');
+    expect(i18n.t('app.name')).toBe('Subnet Notes');
+  });
+
+  it('updates the document and notifies once before an unsubscribe', () => {
+    const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    const documentElement = { lang: 'fr' };
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { documentElement },
+    });
+
+    try {
+      const i18n = createI18n('fr');
+      const locales = [];
+      const unsubscribe = i18n.subscribe((locale) => locales.push(locale));
+
+      i18n.setLocale('en');
+      expect(locales).toEqual(['en']);
+      expect(documentElement.lang).toBe('en');
+
+      unsubscribe();
+      i18n.setLocale('en');
+      i18n.setLocale('toString');
+      i18n.setLocale('not-a-locale');
+
+      expect(locales).toEqual(['en']);
+      expect(documentElement.lang).toBe('en');
+      expect(i18n.locale).toBe('en');
+    } finally {
+      if (documentDescriptor) {
+        Object.defineProperty(globalThis, 'document', documentDescriptor);
+      } else {
+        delete globalThis.document;
+      }
+    }
+  });
 });

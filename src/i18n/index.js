@@ -3,6 +3,10 @@ import { fr } from './fr.js';
 
 const bundles = { en, fr };
 
+function isSupportedLocale(locale) {
+  return typeof locale === 'string' && Object.hasOwn(bundles, locale);
+}
+
 export function flattenKeys(value, prefix = '') {
   return Object.entries(value).flatMap(([key, child]) => {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -15,7 +19,7 @@ function lookup(bundle, key) {
 }
 
 export function createI18n(initialLocale) {
-  let locale = initialLocale in bundles ? initialLocale : 'fr';
+  let locale = isSupportedLocale(initialLocale) ? initialLocale : 'fr';
   const listeners = new Set();
 
   return {
@@ -23,7 +27,7 @@ export function createI18n(initialLocale) {
       return locale;
     },
     setLocale(next) {
-      if (!(next in bundles) || next === locale) return;
+      if (!isSupportedLocale(next) || next === locale) return;
       locale = next;
       if (globalThis.document?.documentElement) {
         globalThis.document.documentElement.lang = next;
