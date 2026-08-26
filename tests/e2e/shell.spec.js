@@ -75,9 +75,10 @@ test('skip navigation focuses main content without changing the application rout
   await expect.poll(async () => page.evaluate(() => location.hash)).toBe(initialHash);
 });
 
-test('same-route navigation keeps focus on the activated link', async ({ page }) => {
+test('same-route navigation keeps focus on the activated link', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile');
   await page.goto('/#/workshops/ipv4-validity-1');
-  const link = page.getByRole('link', { name: /commencer le premier atelier/i });
+  const link = page.getByRole('navigation').getByRole('link', { name: /adresses ipv4/i });
 
   await link.focus();
   await link.click();

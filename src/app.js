@@ -1,27 +1,54 @@
-import { saveProgress } from './storage/progress.js';
+import { curriculum, getWorkshopDefinition } from './content/curriculum.js';
+import { completeWorkshop, saveProgress } from './storage/progress.js';
 import { renderHome } from './ui/home.js';
 import { createShell } from './ui/shell.js';
+import { renderWorkshop } from './ui/workshop.js';
 
-const LEARNING_PATH = [
-  { id: 'ipv4', workshopId: 'ipv4-validity-1', titleKey: 'path.ipv4.title', summaryKey: 'path.ipv4.summary' },
-  { id: 'subnets', workshopId: 'subnet-range-1', titleKey: 'path.subnets.title', summaryKey: 'path.subnets.summary' },
-  { id: 'local', workshopId: 'neighbors-1', titleKey: 'path.local.title', summaryKey: 'path.local.summary' },
-  { id: 'gateways', workshopId: 'valid-gateway-2', titleKey: 'path.gateways.title', summaryKey: 'path.gateways.summary' },
-  { id: 'routing', workshopId: 'route-parts-1', titleKey: 'path.routing.title', summaryKey: 'path.routing.summary' },
-  { id: 'exam', workshopId: 'guided-mission-1', titleKey: 'path.exam.title', summaryKey: 'path.exam.summary' },
-];
+const stageEntryWorkshops = {
+  ipv4: 'ipv4-validity-1',
+  subnets: 'subnet-range-1',
+  local: 'neighbors-1',
+  gateways: 'valid-gateway-2',
+  routing: 'route-parts-1',
+  exam: 'guided-mission-1',
+};
+
+const LEARNING_PATH = curriculum.map((stage) => ({
+  id: stage.id,
+  workshopId: stageEntryWorkshops[stage.id] ?? stage.workshops[0],
+  titleKey: stage.titleKey,
+  summaryKey: `path.${stage.id}.summary`,
+}));
 
 function routeFromHash() {
   const route = globalThis.location?.hash?.replace(/^#/, '');
   return route || '/';
 }
 
+function workshopRoute(route) {
+  const [path, query = ''] = route.split('?');
+  const match = path.match(/^\/workshops\/([^/]+)$/);
+  if (!match) return null;
+  return {
+    id: decodeURIComponent(match[1]),
+    seed: new URLSearchParams(query).get('seed'),
+  };
+}
+
 export function createApp(root, dependencies) {
   if (!(root instanceof Element)) throw new TypeError('An application root element is required');
 
   const { i18n, storage } = dependencies;
-  const progress = dependencies.progress;
+  let progress = dependencies.progress;
   let currentRoute = routeFromHash();
+  let workshopController = null;
+  let activeWorkshopId = null;
+
+  const progressView = new Proxy({}, {
+    get(_target, property) {
+      return progress[property];
+    },
+  });
 
   function navigate(route) {
     const nextHash = `#${route}`;
@@ -29,13 +56,61 @@ export function createApp(root, dependencies) {
     globalThis.location.hash = nextHash;
   }
 
-  const shell = createShell({ i18n, progress, sections: LEARNING_PATH, onNavigate: navigate });
+  const shell = createShell({ i18n, progress: progressView, sections: LEARNING_PATH, onNavigate: navigate });
   root.replaceChildren(shell.element);
+
+  function refreshShellProgress() {
+    const complete = LEARNING_PATH.filter((section) => Boolean(progress.completed?.[section.workshopId])).length;
+    const value = shell.element.querySelector('.progress-value');
+    const meter = shell.element.querySelector('.progress-meter');
+    if (value) value.textContent = `${complete} / ${LEARNING_PATH.length}`;
+    if (meter) {
+      meter.value = complete;
+      meter.setAttribute('aria-label', i18n.t('progress.summary', {
+        completed: complete,
+        total: LEARNING_PATH.length,
+      }));
+    }
+    shell.renderNavigation();
+  }
+
+  function recordCompletion(result) {
+    progress = completeWorkshop(progress, result.workshopId, {
+      attempts: result.attempts,
+      hints: result.hints,
+      seed: result.seed,
+    });
+    saveProgress(storage, progress);
+    refreshShellProgress();
+  }
+
+  function closeWorkshop() {
+    workshopController?.destroy();
+    workshopController = null;
+    activeWorkshopId = null;
+  }
 
   function renderRoute() {
     currentRoute = routeFromHash();
-    const workshopView = currentRoute.startsWith('/workshops/');
-    shell.setView(workshopView ? 'workshop' : 'home');
+    const requestedWorkshop = workshopRoute(currentRoute);
+    const definition = requestedWorkshop ? getWorkshopDefinition(requestedWorkshop.id) : null;
+    shell.setView(definition ? 'workshop' : 'home');
+
+    if (definition) {
+      if (workshopController && activeWorkshopId === definition.id) return;
+      closeWorkshop();
+      workshopController = renderWorkshop({
+        i18n,
+        definition,
+        seed: requestedWorkshop.seed || `${definition.id}-practice`,
+        onComplete: recordCompletion,
+      });
+      activeWorkshopId = definition.id;
+      shell.outlet.replaceChildren(workshopController.element);
+      return;
+    }
+
+    closeWorkshop();
     shell.outlet.replaceChildren(renderHome({
       i18n,
       progress,
@@ -50,8 +125,9 @@ export function createApp(root, dependencies) {
   }
 
   const unsubscribeLocale = i18n.subscribe((locale) => {
-    progress.locale = locale;
+    progress = { ...progress, locale };
     saveProgress(storage, progress);
+    refreshShellProgress();
     renderRoute();
   });
   globalThis.addEventListener('hashchange', onHashChange);
@@ -69,6 +145,7 @@ export function createApp(root, dependencies) {
     destroy() {
       unsubscribeLocale();
       globalThis.removeEventListener('hashchange', onHashChange);
+      closeWorkshop();
       shell.destroy();
       root.replaceChildren();
     },

@@ -362,3 +362,211 @@
     grid-column: 2;
   }
 }
+
+.workshop-view {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 5vw, 5rem) clamp(1.1rem, 5vw, 4.5rem) 5rem;
+}
+
+.workshop-lesson {
+  display: grid;
+  padding-bottom: clamp(2rem, 4vw, 3.5rem);
+  align-items: end;
+  border-bottom: 1px solid var(--rule-strong);
+  gap: clamp(1.5rem, 5vw, 4rem);
+  grid-template-columns: minmax(0, 1.35fr) minmax(230px, 0.65fr);
+}
+
+.workshop-lesson h1 {
+  font-size: clamp(2.5rem, 5vw, 4.6rem);
+}
+
+.workshop-intro {
+  max-width: 60ch;
+  margin-bottom: 0;
+  color: var(--muted-ink);
+  font-size: 1.02rem;
+}
+
+.exercise-note {
+  display: grid;
+  min-width: 0;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--rule-strong);
+  background: var(--sheet);
+  box-shadow: 4px 4px 0 var(--network-soft);
+  gap: 0.35rem;
+}
+
+.exercise-note span {
+  color: var(--accent-dark);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.exercise-note strong,
+.exercise-note small {
+  overflow-wrap: anywhere;
+}
+
+.exercise-note strong {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+.exercise-note small {
+  color: var(--muted-ink);
+}
+
+.workshop-form {
+  margin-top: clamp(2rem, 4vw, 3.25rem);
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  border: 1px solid var(--rule-strong);
+  background: var(--sheet);
+  box-shadow: var(--shadow);
+}
+
+.workshop-form-heading {
+  max-width: 46rem;
+  margin-bottom: 1.6rem;
+}
+
+.workshop-form-heading h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.55rem, 3vw, 2.35rem);
+}
+
+.workshop-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 1rem;
+}
+
+.workshop-field {
+  display: grid;
+  min-width: 0;
+  gap: 0.4rem;
+}
+
+.workshop-field label {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.workshop-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0.7rem 0.8rem;
+  border: 2px solid var(--accent);
+  border-radius: 0;
+  background: #fffaf4;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+.workshop-field small {
+  color: var(--muted-ink);
+  font-size: 0.7rem;
+}
+
+.workshop-actions {
+  display: flex;
+  margin-top: 1.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.button-secondary {
+  border-color: var(--rule-strong);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.button-secondary:hover {
+  border-color: var(--network-link);
+}
+
+.button-text {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-dark);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+.workshop-feedback {
+  display: grid;
+  margin-top: 1rem;
+  gap: 0.8rem;
+}
+
+.feedback {
+  padding: 1rem 1.15rem;
+  border-left: 4px solid var(--rule-strong);
+  background: var(--sheet);
+}
+
+.feedback p {
+  margin: 0.25rem 0 0;
+  color: var(--muted-ink);
+}
+
+.feedback-error {
+  border-color: var(--accent-dark);
+}
+
+.feedback-hint {
+  border-color: var(--network-link);
+  background: var(--network-soft);
+}
+
+.feedback-success {
+  border-color: var(--network-link);
+}
+
+.correction-panel {
+  margin-top: 1.5rem;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  border: 1px solid var(--network-link);
+  background: var(--network-soft);
+}
+
+.correction-panel h2 {
+  font-size: clamp(1.6rem, 3vw, 2.35rem);
+}
+
+.correction-steps {
+  display: grid;
+  margin: 1.5rem 0 0;
+  padding-left: 1.4rem;
+  gap: 0.85rem;
+}
+
+.correction-steps li {
+  padding-left: 0.35rem;
+}
+
+@media (max-width: 720px) {
+  .workshop-lesson {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workshop-form {
+    margin-inline: 0;
+  }
+
+  .workshop-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workshop-actions .button {
+    width: 100%;
+  }
+}
