@@ -6,6 +6,7 @@ import { fr } from '../../src/i18n/fr.js';
 import { curriculum } from '../../src/content/curriculum.js';
 import { getWorkshopGenerator } from '../../src/exercises/generators.js';
 import { validateSubmission } from '../../src/exercises/validators.js';
+import { formatIPv4 } from '../../src/core/ipv4.js';
 
 const taskSixDiagnosticKeys = [
   'diagnostic.invalid-ip',
@@ -100,10 +101,58 @@ describe('i18n', () => {
     const hint = getHint(exercise, { ...validation, diagnostics: [diagnostic] }, 1);
     const french = createI18n('fr');
 
-    expect(french.t(diagnostic.messageKey, diagnostic.params)).toContain('Routeur local');
+    expect(french.t(diagnostic.messageKey, diagnostic.params)).toBe(
+      'Cet appareil et l’appareil « Routeur local » ne sont pas dans le même sous-réseau /27.',
+    );
     expect(french.t(diagnostic.messageKey, diagnostic.params)).not.toContain('router');
-    expect(french.t(hint.key, hint.params)).toContain('Hôte Alpha');
+    expect(french.t(hint.key, hint.params)).toBe(
+      'Compare les deux extrémités du lien autour de l’appareil « Hôte Alpha ».',
+    );
     expect(french.t(hint.key, hint.params)).not.toContain('host-a');
+  });
+
+  it('places real generated device labels in grammatical French sentence contexts', () => {
+    const french = createI18n('fr');
+    const route = getWorkshopGenerator('packet-path-3')({ seed: 'localized-route-context' });
+    const gateway = getWorkshopGenerator('valid-gateway-2')({ seed: 'localized-gateway-context' });
+    const returnPath = getWorkshopGenerator('return-path-4')({ seed: 'localized-return-context' });
+    const routeHint = getHint(route, null, 1);
+    const gatewayHint = getHint(gateway, null, 1);
+    const returnHint = getHint(returnPath, {
+      diagnostics: [{ code: 'missing-return-path', deviceId: 'boreal', field: null, params: {} }],
+    }, 1);
+
+    expect(french.t(routeHint.key, routeHint.params)).toBe(
+      'Suis l’objectif entre les appareils « Hôte Alpha » et « Hôte Bêta », puis repère la route modifiable sur l’appareil « Routeur Atlas ».',
+    );
+    expect(french.t(gatewayHint.key, gatewayHint.params)).toBe(
+      'Observe la passerelle configurée sur l’appareil « Hôte Alpha ». Elle doit appartenir au même sous-réseau que l’hôte.',
+    );
+    expect(french.t(returnHint.key, returnHint.params)).toBe(
+      'Le problème se situe du côté de l’appareil « Routeur Boréal », après le trajet aller.',
+    );
+  });
+
+  it('keeps generated duplicate-address and missing-route diagnostics grammatical in French', () => {
+    const french = createI18n('fr');
+    const local = getWorkshopGenerator('same-subnet-3')({ seed: 'localized-diagnostic-context' });
+    const localField = local.editableFields[0];
+    const routerAddress = local.devices.find((device) => device.id === 'router').interfaces[0].address;
+    const duplicate = validateSubmission(local, {
+      ...local.solution,
+      [localField]: formatIPv4(routerAddress),
+    }).diagnostics.find((entry) => entry.code === 'duplicate-address');
+    const routed = getWorkshopGenerator('packet-path-3')({ seed: 'localized-diagnostic-context' });
+    routed.devices.find((device) => device.id === 'alpha').routes = [];
+    const missingDefault = validateSubmission(routed, routed.solution).diagnostics
+      .find((entry) => entry.code === 'missing-default-route');
+
+    expect(french.t(duplicate.messageKey, duplicate.params)).toBe(
+      'L’adresse 10.19.166.1 est déjà utilisée par l’appareil « Routeur local » (interface router-lan).',
+    );
+    expect(french.t(missingDefault.messageKey, missingDefault.params)).toBe(
+      'Aucune route par défaut ne permet à cet hôte de joindre l’appareil « Hôte Bêta ».',
+    );
   });
 
   it('keeps semantic field-shape articles grammatical in both locales', () => {
