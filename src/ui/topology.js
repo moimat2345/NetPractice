@@ -52,6 +52,7 @@ export function createTopology({
   devices,
   links,
   selectedDeviceId,
+  deviceStatuses = {},
   onSelect = () => {},
 }) {
   const mobileQuery = globalThis.matchMedia?.('(max-width: 599px)');
@@ -82,12 +83,19 @@ export function createTopology({
 
   packetFlowOrder(devices, links).forEach((device) => {
     const label = i18n.t(device.labelKey);
+    const status = deviceStatuses[device.id] ?? null;
+    const statusLabel = status
+      ? i18n.t(status === 'missing' ? 'exam.missingInformation' : 'exam.checkDevice')
+      : null;
     const node = element('button', {
       className: `topology-device topology-device-${device.kind}`,
       type: 'button',
       'data-device-id': device.id,
+      'data-device-status': status,
       'data-focus-key': `device:${device.id}`,
-      'aria-label': i18n.t('action.selectDevice', { deviceId: label }),
+      'aria-label': statusLabel
+        ? i18n.t('action.selectDeviceStatus', { deviceId: label, status: statusLabel })
+        : i18n.t('action.selectDevice', { deviceId: label }),
       'aria-pressed': String(device.id === selectedDeviceId),
       style: `--device-x:${device.position.x}%;--device-y:${device.position.y}%;`,
       onClick: () => onSelect(device.id),
@@ -97,6 +105,7 @@ export function createTopology({
       element('small', {}, [device.kind === 'switch'
         ? i18n.t('topology.segment')
         : i18n.t('topology.interfaceCount', { count: device.interfaces.length })]),
+      status && element('span', { className: 'topology-device-status', 'aria-hidden': 'true' }, [statusLabel]),
     ]);
     nodes.set(device.id, node);
     deviceLayer.append(node);

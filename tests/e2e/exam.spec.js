@@ -127,6 +127,42 @@ test('keeps focus on mission, device, and submit controls across exam rerenders'
   await expect(page.getByRole('button', { name: /submit mission|valider la mission/i })).toBeFocused();
 });
 
+test('shows missing information before submission and balanced path diagnostics after a failed check', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop');
+  await page.clock.install();
+  const seed = 'e2e-live-diagnostic';
+  await page.goto(`/#/exam?seed=${seed}`);
+
+  const missingDevice = page.locator('[data-device-status="missing"]').first();
+  await expect(missingDevice).toContainText(/information manquante|missing information/i);
+  await expect(missingDevice).toHaveAccessibleName(/sélectionner.+information manquante|select.+missing information/i);
+  await missingDevice.click();
+  const missingInput = page.locator('[data-device-config] input[aria-invalid="true"]').first();
+  await expect(missingInput).toBeVisible();
+  await expect(page.locator('[data-device-config]')).toContainText(/information manquante|missing information/i);
+
+  const [solution] = await missionSolutions(page, seed);
+  for (const [field, value] of Object.entries(solution)) {
+    const deviceId = field.split('.')[0];
+    await page.locator(`[data-device-id="${deviceId}"]`).click();
+    await page.locator(`input[name="${field}"]`).fill(value);
+  }
+  const gatewayField = Object.keys(solution).find((field) => field.endsWith('.gateway'));
+  expect(gatewayField).toBeTruthy();
+  const gatewayDevice = gatewayField.split('.')[0];
+  await page.locator(`[data-device-id="${gatewayDevice}"]`).click();
+  await page.locator(`input[name="${gatewayField}"]`).fill('10.0.0.1');
+  await page.getByRole('button', { name: /submit mission|valider la mission/i }).click();
+
+  const diagnostics = page.locator('.exam-live-diagnostics');
+  await expect(diagnostics).toBeVisible();
+  await expect(diagnostics.locator('[data-failed-path]')).not.toHaveCount(0);
+  await expect(diagnostics).not.toContainText('must-not-leak');
+  await diagnostics.evaluate((node) => { node.dataset.stableDiagnostic = 'true'; });
+  await page.locator(`input[name="${gatewayField}"]`).fill('10.0.0.2');
+  await expect(diagnostics).toHaveAttribute('data-stable-diagnostic', 'true');
+});
+
 test('starts an explicitly seeded exam from the visible final-stage action', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
   await page.clock.install();

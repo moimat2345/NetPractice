@@ -11,7 +11,7 @@ function displayedValue(property, value) {
   return formatIPv4(value);
 }
 
-function configField({ i18n, device, section, entry, property, submission, onChange, index }) {
+function configField({ i18n, device, section, entry, property, submission, missingFields, onChange, index }) {
   const editable = Boolean(entry.editable?.[property]);
   const id = fieldId(device.id, section, entry.id, property);
   const inputId = `device-field-${device.id}-${section}-${index}-${property}`;
@@ -23,6 +23,7 @@ function configField({ i18n, device, section, entry, property, submission, onCha
         ? 'field.prefix'
         : 'field.address';
   const label = i18n.t(labelKey);
+  const missing = editable && missingFields.has(id);
   const control = editable
     ? element('input', {
       id: inputId,
@@ -33,14 +34,17 @@ function configField({ i18n, device, section, entry, property, submission, onCha
       spellcheck: 'false',
       'data-focus-key': `field:${id}`,
       'aria-describedby': `${inputId}-note`,
+      'aria-invalid': missing ? 'true' : null,
       onInput: (event) => onChange(id, event.currentTarget.value),
     })
     : element('span', { className: 'device-field-value' }, [displayedValue(property, entry[property])]);
 
-  return element('div', { className: `device-field${editable ? ' is-editable' : ''}` }, [
+  return element('div', { className: `device-field${editable ? ' is-editable' : ''}${missing ? ' is-missing' : ''}` }, [
     element('label', editable ? { for: inputId } : {}, [label]),
     control,
-    editable && element('small', { id: `${inputId}-note` }, [i18n.t('workshop.editable')]),
+    editable && element('small', { id: `${inputId}-note` }, [
+      i18n.t(missing ? 'exam.missingInformation' : 'workshop.editable'),
+    ]),
   ]);
 }
 
@@ -69,11 +73,21 @@ function renderSwitchConfig(i18n, device, devices, links) {
   ]);
 }
 
-export function renderDeviceConfig({ i18n, device, devices, links, submission, onChange = () => {} }) {
+export function renderDeviceConfig({
+  i18n,
+  device,
+  devices,
+  links,
+  submission,
+  missingFields = new Set(),
+  onChange = () => {},
+}) {
   if (!device) {
     return element('p', { className: 'device-config-empty' }, [i18n.t('workshop.noSelection')]);
   }
   const titleId = `device-config-title-${device.id}`;
+  const deviceHasMissing = [...missingFields].some((field) =>
+    (device.id === field.split('.')[0]) || field.startsWith(`${device.id}.`));
   const panel = element('section', {
     className: 'device-config',
     'data-device-config': device.id,
@@ -87,6 +101,7 @@ export function renderDeviceConfig({ i18n, device, devices, links, submission, o
         })]),
       ]),
       element('span', { className: 'device-id' }, [device.id]),
+      deviceHasMissing && element('span', { className: 'device-config-status' }, [i18n.t('exam.missingInformation')]),
     ]),
   ]);
 
@@ -102,8 +117,8 @@ export function renderDeviceConfig({ i18n, device, devices, links, submission, o
       ...device.interfaces.map((entry, index) => element('article', { className: 'config-entry' }, [
         element('p', { className: 'config-entry-id' }, [entry.id]),
         element('div', { className: 'config-entry-fields' }, [
-          configField({ i18n, device, section: 'interfaces', entry, property: 'address', submission, onChange, index }),
-          configField({ i18n, device, section: 'interfaces', entry, property: 'prefix', submission, onChange, index }),
+          configField({ i18n, device, section: 'interfaces', entry, property: 'address', submission, missingFields, onChange, index }),
+          configField({ i18n, device, section: 'interfaces', entry, property: 'prefix', submission, missingFields, onChange, index }),
         ]),
       ])),
     ]));
@@ -117,9 +132,9 @@ export function renderDeviceConfig({ i18n, device, devices, links, submission, o
           entry.id,
         ]),
         element('div', { className: 'config-entry-fields route-fields' }, [
-          configField({ i18n, device, section: 'routes', entry, property: 'destination', submission, onChange, index }),
-          configField({ i18n, device, section: 'routes', entry, property: 'prefix', submission, onChange, index }),
-          configField({ i18n, device, section: 'routes', entry, property: 'gateway', submission, onChange, index }),
+          configField({ i18n, device, section: 'routes', entry, property: 'destination', submission, missingFields, onChange, index }),
+          configField({ i18n, device, section: 'routes', entry, property: 'prefix', submission, missingFields, onChange, index }),
+          configField({ i18n, device, section: 'routes', entry, property: 'gateway', submission, missingFields, onChange, index }),
         ]),
       ])),
     ]));

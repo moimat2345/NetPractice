@@ -96,7 +96,14 @@ function restoreFocus(root, snapshot) {
   }
 }
 
-export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }) {
+export function renderWorkshop({
+  i18n,
+  definition,
+  seed,
+  onComplete = () => {},
+  onNavigate = () => {},
+  nextTarget = null,
+}) {
   if (!definition) throw new TypeError('A workshop definition is required');
   const root = element('article', { className: 'workshop-view', 'data-workshop': definition.id });
   let variation = 0;
@@ -244,29 +251,47 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
       }),
       renderFields(),
       element('div', { className: 'workshop-actions' }, [
-        element('button', {
-          className: 'button button-primary',
-          type: 'submit',
-          'data-focus-key': 'action:check',
-        }, [i18n.t('action.check')]),
-        state.hintLevel < 3 && element('button', {
-          className: 'button button-secondary',
-          type: 'button',
-          'data-focus-key': 'action:hint',
-          onClick: revealHint,
-        }, [i18n.t('action.hint', { level: state.hintLevel + 1 })]),
-        state.validation && !state.validation.ok && element('button', {
-          className: 'button button-text',
-          type: 'button',
-          'data-focus-key': 'action:correction',
-          onClick: toggleCorrection,
-        }, [i18n.t(state.phase === 'correction' ? 'action.hideSolution' : 'action.showSolution')]),
-        state.attempts > 0 && element('button', {
-          className: 'button button-secondary',
-          type: 'button',
-          'data-focus-key': 'action:new-exercise',
-          onClick: newExercise,
-        }, [i18n.t('action.newExercise')]),
+        ...(state.phase === 'correct'
+          ? [
+            element('button', {
+              className: 'button button-secondary',
+              type: 'button',
+              'data-focus-key': 'action:new-exercise',
+              onClick: newExercise,
+            }, [i18n.t('action.newExercise')]),
+            nextTarget && element('button', {
+              className: 'button button-primary workshop-next-action',
+              type: 'button',
+              'data-focus-key': 'action:next-workshop',
+              'data-action': 'next-workshop',
+              onClick: () => onNavigate(nextTarget.route),
+            }, [i18n.t(nextTarget.labelKey)]),
+          ]
+          : [
+            element('button', {
+              className: 'button button-primary',
+              type: 'submit',
+              'data-focus-key': 'action:check',
+            }, [i18n.t('action.check')]),
+            state.hintLevel < 3 && element('button', {
+              className: 'button button-secondary',
+              type: 'button',
+              'data-focus-key': 'action:hint',
+              onClick: revealHint,
+            }, [i18n.t('action.hint', { level: state.hintLevel + 1 })]),
+            state.validation && !state.validation.ok && element('button', {
+              className: 'button button-text',
+              type: 'button',
+              'data-focus-key': 'action:correction',
+              onClick: toggleCorrection,
+            }, [i18n.t(state.phase === 'correction' ? 'action.hideSolution' : 'action.showSolution')]),
+            state.attempts > 0 && element('button', {
+              className: 'button button-secondary',
+              type: 'button',
+              'data-focus-key': 'action:new-exercise',
+              onClick: newExercise,
+            }, [i18n.t('action.newExercise')]),
+          ]),
       ]),
     ]);
     const feedback = element('div', { className: 'workshop-feedback' }, [

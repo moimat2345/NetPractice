@@ -7,6 +7,7 @@ import {
 } from './learning-progress.js';
 
 export function createShell({ i18n, progress, sections = [], onNavigate = () => {} }) {
+  let activeStageId = null;
   const skipLink = document.querySelector('.skip-link');
   const frame = element('div', { className: 'app-frame', 'data-view': 'home' });
   const wordmark = element('a', {
@@ -72,13 +73,16 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
     sections.forEach((section, index) => {
       const complete = sectionCompleted(section, progress);
       const started = sectionStarted(section, progress);
-      const current = !complete && index === (firstPending === -1 ? 0 : firstPending);
+      const current = section.id === activeStageId;
+      const next = !complete && index === (firstPending === -1 ? 0 : firstPending);
       const stateKey = complete
         ? 'course.completed'
-        : started ? 'course.inProgress' : current ? 'course.next' : 'course.locked';
+        : started ? 'course.inProgress' : next ? 'course.next' : 'course.locked';
       const targetWorkshop = nextWorkshopInSection(section, progress) ?? section.workshops[0];
       const link = element('a', {
         className: `curriculum-link${current ? ' is-current' : ''}${complete ? ' is-complete' : ''}${started && !complete ? ' is-started' : ''}`,
+        'data-stage-id': section.id,
+        'aria-current': current ? 'step' : null,
         href: `#/workshops/${targetWorkshop}`,
         onClick: (event) => {
           event.preventDefault();
@@ -135,6 +139,12 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
     element: frame,
     outlet,
     renderNavigation,
+    setActiveStage(stageId) {
+      const nextStageId = sections.some((section) => section.id === stageId) ? stageId : null;
+      if (activeStageId === nextStageId) return;
+      activeStageId = nextStageId;
+      renderNavigation();
+    },
     setView,
     destroy() {
       unsubscribe();

@@ -12,6 +12,22 @@ const LEARNING_PATH = curriculum.map((stage) => ({
   titleKey: stage.titleKey,
   summaryKey: `path.${stage.id}.summary`,
 }));
+const WORKSHOP_ORDER = LEARNING_PATH.flatMap((stage) => stage.workshops);
+
+function nextWorkshopTarget(workshopId) {
+  const index = WORKSHOP_ORDER.indexOf(workshopId);
+  if (index === -1) return null;
+  if (index < WORKSHOP_ORDER.length - 1) {
+    return {
+      route: `/workshops/${WORKSHOP_ORDER[index + 1]}`,
+      labelKey: 'action.nextWorkshop',
+    };
+  }
+  return {
+    route: `/exam?seed=mock-${Date.now().toString(36)}`,
+    labelKey: 'action.startExam',
+  };
+}
 
 function routeFromHash() {
   const route = globalThis.location?.hash?.replace(/^#/, '');
@@ -109,6 +125,7 @@ export function createApp(root, dependencies) {
     const requestedWorkshop = workshopRoute(currentRoute);
     const definition = requestedWorkshop ? getWorkshopDefinition(requestedWorkshop.id) : null;
     shell.setView(definition || requestedExam ? 'workshop' : 'home');
+    shell.setActiveStage(definition?.stageId ?? (requestedExam ? 'exam' : null));
 
     if (requestedExam) {
       closeWorkshop();
@@ -126,11 +143,14 @@ export function createApp(root, dependencies) {
       const workshopKey = `${definition.id}\u0000${effectiveSeed}`;
       if (workshopController && activeWorkshopKey === workshopKey) return;
       closeWorkshop();
+      const nextTarget = nextWorkshopTarget(definition.id);
       workshopController = renderWorkshop({
         i18n,
         definition,
         seed: effectiveSeed,
         onComplete: recordCompletion,
+        onNavigate: navigate,
+        nextTarget,
       });
       activeWorkshopKey = workshopKey;
       shell.outlet.replaceChildren(workshopController.element);

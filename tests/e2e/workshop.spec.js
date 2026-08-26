@@ -20,7 +20,7 @@ test('explains an error, reveals progressive hints, and generates another attemp
   await expect(correction).toContainText('10.189.37.63');
 
   const firstSeed = await page.locator('[data-exercise-seed]').getAttribute('data-exercise-seed');
-  await page.getByRole('button', { name: /new exercise|nouvel exercice/i }).click();
+  await page.getByRole('button', { name: /new variation|nouvelle variante/i }).click();
   await expect(page.locator('[data-exercise-seed]')).not.toHaveAttribute('data-exercise-seed', firstSeed);
 });
 
@@ -116,6 +116,37 @@ test('records a successful attempt and refreshes the shell progress', async ({ p
   await expect(page.getByRole('banner').getByText('1 / 6')).toBeVisible();
   await expect.poll(async () => page.evaluate(() =>
     JSON.parse(localStorage.getItem('subnet-notes-progress'))?.completed?.['subnet-range-1']?.attempts)).toBe(1);
+
+  await expect(page.getByRole('button', { name: /nouvelle variante/i })).toBeVisible();
+  const nextWorkshop = page.getByRole('button', { name: /atelier suivant/i });
+  await expect(nextWorkshop).toBeVisible();
+  await expect(page.getByRole('button', { name: /tester le réseau|indice/i })).toHaveCount(0);
+  await expect(page.locator('.workshop-actions .button').first()).toHaveText(/nouvelle variante/i);
+  await expect(page.locator('.workshop-actions .button').last()).toHaveText(/atelier suivant/i);
+  await nextWorkshop.click();
+  await expect(page.locator('[data-workshop="usable-host-2"]')).toBeVisible();
+});
+
+test('opens the timed exam from the final workshop success action', async ({ page }) => {
+  const seed = 'e2e-final-workshop';
+  await page.goto(`/#/workshops/mock-exam?seed=${seed}`);
+  const solution = await page.evaluate(async (workshopSeed) => {
+    const { getWorkshopGenerator } = await import('/src/exercises/generators.js');
+    return getWorkshopGenerator('mock-exam')({ seed: workshopSeed }).solution;
+  }, seed);
+
+  for (const [field, value] of Object.entries(solution)) {
+    const deviceId = field.split('.')[0];
+    await page.locator(`[data-device-id="${deviceId}"]`).click();
+    await page.locator(`input[name="${field}"]`).fill(value);
+  }
+  await page.getByRole('button', { name: /tester le réseau|test the network/i }).click();
+
+  const startExam = page.getByRole('button', { name: /lancer l’évaluation|start mock exam/i });
+  await expect(startExam).toBeVisible();
+  await startExam.click();
+  await expect(page).toHaveURL(/\/#\/exam\?seed=mock-/);
+  await expect(page.getByRole('timer')).toBeVisible();
 });
 
 test('workshop stays within the mobile viewport', async ({ page }, testInfo) => {

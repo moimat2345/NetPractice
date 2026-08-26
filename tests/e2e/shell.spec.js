@@ -159,6 +159,16 @@ test('same-route navigation keeps focus on the activated link', async ({ page },
   await expect.poll(async () => page.evaluate(() => location.hash)).toBe('#/workshops/ipv4-validity-1');
 });
 
+test('marks the stage of the workshop being viewed instead of the first unfinished stage', async ({ page }, testInfo) => {
+  test.skip(['mobile', 'portrait'].includes(testInfo.project.name));
+  await page.goto('/#/workshops/valid-gateway-2');
+
+  const gateways = page.locator('[data-stage-id="gateways"]');
+  await expect(gateways).toHaveClass(/is-current/);
+  await expect(gateways).toHaveAttribute('aria-current', 'step');
+  await expect(page.locator('.curriculum-link.is-current')).toHaveCount(1);
+});
+
 test('safe DOM helpers ignore string event-handler attributes', async ({ page }) => {
   await page.goto('/');
 

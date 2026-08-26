@@ -62,6 +62,27 @@ function diagnosticCodes(validation) {
   return [...new Set(codes)];
 }
 
+function liveCheckSummary(mission, validation) {
+  const affectedDeviceIds = validation?.diagnostics
+    ?.map((diagnostic) => diagnostic?.deviceId)
+    .filter((deviceId) => typeof deviceId === 'string' && deviceId.length > 0) ?? [];
+  const failedPaths = validation?.traces
+    ?.flatMap((trace, index) => {
+      const goal = mission.goals[index];
+      if (trace?.ok !== false || !goal) return [];
+      return [{
+        sourceId: goal.sourceId,
+        destinationId: goal.destinationId,
+        direction: trace.failedDirection === 'return' ? 'return' : 'forward',
+      }];
+    }) ?? [];
+  return {
+    diagnosticCodes: diagnosticCodes(validation),
+    affectedDeviceIds: [...new Set(affectedDeviceIds)],
+    failedPaths,
+  };
+}
+
 function missionResult(missionSeed, passed, codes = []) {
   return { missionSeed, passed, diagnosticCodes: passed ? [] : codes };
 }
@@ -84,6 +105,7 @@ export function createExamState({
   const submissions = missions.map((mission) => ({ ...mission.initial }));
   const results = Array(EXAM_MISSION_COUNT).fill(null);
   const lastDiagnosticCodes = Array.from({ length: EXAM_MISSION_COUNT }, () => []);
+  const checks = Array(EXAM_MISSION_COUNT).fill(null);
   const announcements = [];
   const announced = new Set();
   let currentIndex = 0;
@@ -173,6 +195,7 @@ export function createExamState({
       }
       const passed = validation?.ok === true;
       lastDiagnosticCodes[index] = diagnosticCodes(validation);
+      checks[index] = passed ? null : liveCheckSummary(missions[index], validation);
       if (passed) {
         results[index] = missionResult(missions[index].seed, true);
         if (results.every(Boolean)) finalize('complete');
@@ -198,6 +221,7 @@ export function createExamState({
         status,
         results,
         submissions,
+        checks,
       });
     },
   };
@@ -267,14 +291,72 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
   let destroyed = false;
   let renderedStatus = null;
 
+  function deviceLabel(mission, deviceId) {
+    const device = mission.devices.find((candidate) => candidate.id === deviceId);
+    return device ? i18n.t(device.labelKey) : deviceId;
+  }
+
+  function missingFieldsFor(mission, submission) {
+    return new Set(mission.editableFields.filter((field) =>
+      String(submission[field] ?? '').trim().length === 0));
+  }
+
+  function deviceStatuses(mission, missingFields, check) {
+    const statuses = {};
+    for (const field of missingFields) {
+      const candidateId = mission.fieldMeta?.[field]?.deviceId ?? field.split('.')[0];
+      if (mission.devices.some((device) => device.id === candidateId)) statuses[candidateId] = 'missing';
+    }
+    for (const deviceId of check?.affectedDeviceIds ?? []) {
+      if (!statuses[deviceId]) statuses[deviceId] = 'issue';
+    }
+    return statuses;
+  }
+
+  function renderLiveCheck(mission, check) {
+    if (!check) return null;
+    return element('section', {
+      className: 'exam-live-diagnostics',
+      'aria-label': i18n.t('exam.liveCheckTitle'),
+    }, [
+      element('div', { className: 'exam-live-diagnostics-heading' }, [
+        element('strong', {}, [i18n.t('exam.liveCheckTitle')]),
+        element('span', {}, [i18n.t('exam.noAnswerShown')]),
+      ]),
+      check.failedPaths.length > 0
+        ? element('div', { className: 'exam-check-group' }, [
+          element('p', { className: 'note-label' }, [i18n.t('exam.failingPaths')]),
+          element('ul', {}, check.failedPaths.map((path, index) => element('li', {
+            'data-failed-path': String(index),
+          }, [i18n.t(`exam.path.${path.direction}`, {
+            source: deviceLabel(mission, path.sourceId),
+            destination: deviceLabel(mission, path.destinationId),
+          })]))),
+        ])
+        : element('p', { className: 'exam-path-unavailable' }, [i18n.t('exam.pathUnavailable')]),
+      check.affectedDeviceIds.length > 0 && element('div', { className: 'exam-check-group' }, [
+        element('p', { className: 'note-label' }, [i18n.t('exam.devicesToCheck')]),
+        element('p', {}, [check.affectedDeviceIds.map((deviceId) => deviceLabel(mission, deviceId)).join(' · ')]),
+      ]),
+      check.diagnosticCodes.length > 0 && element('div', { className: 'exam-check-group' }, [
+        element('p', { className: 'note-label' }, [i18n.t('exam.checkDetails')]),
+        element('ul', {}, check.diagnosticCodes.map((code) =>
+          element('li', {}, [i18n.t(`exam.diagnostic.${code}`)]))),
+      ]),
+    ]);
+  }
+
   function renderNavigation(snapshot) {
     return element('nav', {
       className: 'exam-mission-nav',
       'aria-label': i18n.t('exam.missionNavigation'),
     }, state.missions.map((mission, index) => {
       const result = snapshot.results[index];
-      const statusKey = result?.passed ? 'exam.statusPassed' : index === snapshot.index ? 'exam.statusActive' : 'exam.statusPending';
-      const missionStatus = result?.passed ? 'passed' : index === snapshot.index ? 'active' : 'pending';
+      const needsReview = Boolean(snapshot.checks[index]);
+      const statusKey = result?.passed
+        ? 'exam.statusPassed'
+        : index === snapshot.index ? 'exam.statusActive' : needsReview ? 'exam.statusReview' : 'exam.statusPending';
+      const missionStatus = result?.passed ? 'passed' : index === snapshot.index ? 'active' : needsReview ? 'review' : 'pending';
       return element('button', {
         className: 'exam-mission-tab',
         type: 'button',
@@ -295,11 +377,15 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
 
   function renderRunning(snapshot) {
     const mission = state.missions[snapshot.index];
+    const submission = snapshot.submissions[snapshot.index];
+    const missingFields = missingFieldsFor(mission, submission);
+    const check = snapshot.checks[snapshot.index];
     topologyController = createTopology({
       i18n,
       devices: mission.devices,
       links: mission.links,
       selectedDeviceId: selectedDevices[snapshot.index],
+      deviceStatuses: deviceStatuses(mission, missingFields, check),
       onSelect: (deviceId) => {
         selectedDevices[snapshot.index] = deviceId;
         render();
@@ -318,6 +404,7 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
         const validation = validateSubmission(mission, current.submissions[current.index]);
         state.submit(current.index, validation);
         render();
+        if (!validation.ok && liveRegion) liveRegion.textContent = i18n.t('exam.liveCheckAnnouncement');
       },
     }, [
       element('div', { className: 'workshop-form-heading' }, [
@@ -330,8 +417,14 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
         device: selectedDevice,
         devices: mission.devices,
         links: mission.links,
-        submission: snapshot.submissions[snapshot.index],
-        onChange: (field, value) => state.update(field, value),
+        submission,
+        missingFields,
+        onChange: (field, value) => {
+          const wasMissing = String(submission[field] ?? '').trim().length === 0;
+          if (!state.update(field, value)) return;
+          const isMissing = String(value).trim().length === 0;
+          if (wasMissing !== isMissing) render();
+        },
       }),
       element('div', { className: 'workshop-actions' }, [
         element('button', {
@@ -340,6 +433,7 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
           'data-focus-key': 'exam:submit',
         }, [i18n.t('action.submitMission')]),
       ]),
+      renderLiveCheck(mission, check),
     ]);
     return form;
   }

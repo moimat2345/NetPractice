@@ -104,6 +104,32 @@ describe('mock exam state', () => {
     });
   });
 
+  it('keeps a balanced live check summary after a failed submission', () => {
+    const exam = createExamState({ seed: 'live-check', clock: { now: () => 10_000 } });
+    const goal = exam.missions[0].goals[0];
+
+    exam.submit(0, {
+      ok: false,
+      diagnostics: [{
+        code: 'missing-return-path',
+        deviceId: 'atlas',
+        field: 'atlas.routes.route-1.gateway',
+        params: { gateway: 'must-not-leak' },
+      }],
+      traces: [{ ok: false, failedDirection: 'return' }],
+    });
+
+    expect(exam.snapshot().checks[0]).toEqual({
+      diagnosticCodes: ['missing-return-path'],
+      affectedDeviceIds: ['atlas'],
+      failedPaths: [{
+        sourceId: goal.sourceId,
+        destinationId: goal.destinationId,
+        direction: 'return',
+      }],
+    });
+  });
+
   it('returns deeply immutable detached missions, snapshots, and final records', () => {
     const time = mutableClock();
     let finalRecord;

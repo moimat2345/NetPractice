@@ -145,7 +145,15 @@
 }
 
 .curriculum-link.is-current {
-  box-shadow: inset 3px 0 var(--accent);
+  border-block: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: var(--accent-soft);
+  box-shadow: inset 4px 0 var(--accent);
+}
+
+.curriculum-link.is-current .curriculum-index,
+.curriculum-link.is-current .curriculum-state {
+  color: var(--accent-dark);
+  font-weight: 800;
 }
 
 .curriculum-link.is-complete .curriculum-state {
@@ -758,6 +766,28 @@
   background: var(--network-soft);
 }
 
+.topology-device[data-device-status="missing"] {
+  border-color: var(--accent);
+  background: #fff8f1;
+}
+
+.topology-device[data-device-status="issue"] {
+  border-color: var(--accent-dark);
+}
+
+.topology-device-status {
+  width: fit-content;
+  margin-top: 0.3rem;
+  padding: 0.18rem 0.3rem;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .device-config {
   width: min(100%, 900px);
   margin: 1rem auto 0;
@@ -773,6 +803,7 @@
   justify-content: space-between;
   border-bottom: 1px solid var(--rule);
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .device-config-heading .note-label {
@@ -794,6 +825,16 @@
 .device-id {
   color: var(--muted-ink);
   font-size: 0.65rem;
+}
+
+.device-config-status {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .device-config-groups {
@@ -877,6 +918,11 @@
   font-size: 0.73rem;
 }
 
+.device-field.is-missing input {
+  border-style: dashed;
+  background: #fffdf9;
+}
+
 .device-field small {
   color: var(--accent-dark);
   font-size: 0.6rem;
@@ -954,6 +1000,49 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.workshop-next-action {
+  margin-inline-start: auto;
+}
+
+.exam-live-diagnostics {
+  display: grid;
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--accent);
+  border-inline-start-width: 4px;
+  background: #fff8f1;
+  gap: 0.9rem;
+}
+
+.exam-live-diagnostics-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.exam-live-diagnostics-heading span,
+.exam-path-unavailable {
+  color: var(--muted-ink);
+  font-size: 0.72rem;
+}
+
+.exam-check-group .note-label {
+  margin-bottom: 0.35rem;
+}
+
+.exam-check-group p,
+.exam-check-group ul,
+.exam-path-unavailable {
+  margin-bottom: 0;
+}
+
+.exam-check-group ul {
+  display: grid;
+  padding-left: 1.15rem;
+  gap: 0.3rem;
 }
 
 .button-secondary {
@@ -1062,6 +1151,16 @@
 
   .workshop-actions .button {
     width: 100%;
+  }
+
+  .workshop-next-action {
+    margin-inline-start: 0;
+  }
+
+  .exam-live-diagnostics-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.3rem;
   }
 }
 
