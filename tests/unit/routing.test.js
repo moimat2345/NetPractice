@@ -148,10 +148,18 @@ describe('routing', () => {
   });
 
   it('returns an immutable trace result', () => {
-    const trace = tracePacket(makeRoutedTopology(), 'a', ip('10.0.0.2'));
+    const topology = makeRoutedTopology();
+    const route = topology.devices[0].routes[0];
+    route.editable = { gateway: true };
+    const trace = tracePacket(topology, 'a', ip('10.0.0.2'));
 
     expect(Object.isFrozen(trace)).toBe(true);
     expect(Object.isFrozen(trace.hops)).toBe(true);
     expect(Object.isFrozen(trace.hops[0])).toBe(true);
+    expect(Object.isFrozen(trace.hops[0].route.editable)).toBe(true);
+    expect(() => {
+      trace.hops[0].route.editable.gateway = false;
+    }).toThrow(TypeError);
+    expect(route.editable.gateway).toBe(true);
   });
 });

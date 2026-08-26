@@ -1,9 +1,19 @@
 import { networkOf, sameSubnet } from './subnet.js';
 
+function cloneAndFreeze(value) {
+  if (Array.isArray(value)) return Object.freeze(value.map(cloneAndFreeze));
+  if (value && typeof value === 'object') {
+    return Object.freeze(Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [key, cloneAndFreeze(nestedValue)]),
+    ));
+  }
+  return value;
+}
+
 function freezeTrace(result) {
   const hops = result.hops.map((hop) => Object.freeze({
     ...hop,
-    route: hop.route === null ? null : Object.freeze({ ...hop.route }),
+    route: hop.route === null ? null : cloneAndFreeze(hop.route),
   }));
   return Object.freeze({ ...result, hops: Object.freeze(hops) });
 }
