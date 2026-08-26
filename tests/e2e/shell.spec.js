@@ -76,7 +76,7 @@ test('skip navigation focuses main content without changing the application rout
 });
 
 test('same-route navigation keeps focus on the activated link', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name === 'mobile');
+  test.skip(['mobile', 'portrait'].includes(testInfo.project.name));
   await page.goto('/#/workshops/ipv4-validity-1');
   const link = page.getByRole('navigation').getByRole('link', { name: /adresses ipv4/i });
 

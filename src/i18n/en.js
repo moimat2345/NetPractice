@@ -120,6 +120,14 @@ export const en = {
     requiredGoals: 'Connections to verify',
     noSelection: 'Select a device to inspect its configuration.',
   },
+  topology: {
+    interfaces: 'Interfaces',
+    routes: 'Ordered routes',
+    segment: 'LAN segment',
+    connectedSegment: 'LAN segment connectivity',
+    switchExplanation: 'The switch connects these devices on the same local segment. It has no IP configuration in this exercise.',
+    interfaceCount: '{count} interface(s)',
+  },
   device: {
     focusedHostA: 'Host Alpha',
     focusedRouter: 'Local router',

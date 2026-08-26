@@ -120,6 +120,14 @@ export const fr = {
     requiredGoals: 'Communications à vérifier',
     noSelection: 'Choisis un appareil pour consulter sa configuration.',
   },
+  topology: {
+    interfaces: 'Interfaces',
+    routes: 'Routes ordonnées',
+    segment: 'Segment LAN',
+    connectedSegment: 'Connectivité du segment LAN',
+    switchExplanation: 'Le commutateur relie ces appareils sur le même segment local. Il ne porte pas de configuration IP dans cet exercice.',
+    interfaceCount: '{count} interface(s)',
+  },
   device: {
     focusedHostA: 'Hôte Alpha',
     focusedRouter: 'Routeur local',

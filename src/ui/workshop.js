@@ -2,8 +2,10 @@ import { formatIPv4 } from '../core/ipv4.js';
 import { generateFocusedExercise, generateMission } from '../exercises/generators.js';
 import { getHint } from '../exercises/hints.js';
 import { validateSubmission } from '../exercises/validators.js';
+import { renderDeviceConfig } from './device-config.js';
 import { element, replace } from './dom.js';
 import { renderCorrection, renderDiagnostic, renderHint } from './feedback.js';
+import { createTopology } from './topology.js';
 
 function makeExercise(definition, seed) {
   if (definition.concept === 'routing-mission') {
@@ -87,6 +89,7 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
   let variation = 0;
   let exercise = makeExercise(definition, String(seed));
   let recordedSeed = null;
+  let topologyController = null;
   const state = {
     phase: 'ready',
     hintLevel: 0,
@@ -94,6 +97,7 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
     seed: exercise.seed,
     submission: { ...exercise.initial },
     validation: null,
+    selectedDeviceId: exercise.devices[0]?.id ?? null,
   };
 
   function check() {
@@ -131,39 +135,43 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
     state.seed = exercise.seed;
     state.submission = { ...exercise.initial };
     state.validation = null;
+    state.selectedDeviceId = exercise.devices[0]?.id ?? null;
     render();
     root.querySelector('input')?.focus({ preventScroll: true });
   }
 
   function renderFields() {
     const fields = element('div', { className: 'workshop-fields' });
-    exercise.editableFields.forEach((field, index) => {
-      const labelKey = fieldLabelKey(field, exercise.fieldMeta?.[field]);
-      const inputId = `workshop-field-${index}`;
-      const input = element('input', {
-        id: inputId,
-        name: field,
-        type: 'text',
-        value: state.submission[field] ?? '',
-        autocomplete: 'off',
-        spellcheck: 'false',
-        'aria-describedby': `${inputId}-note`,
-        'data-focus-key': `field:${field}`,
-        onInput: (event) => {
-          state.submission[field] = event.currentTarget.value;
-        },
+    exercise.editableFields
+      .filter((field) => !exercise.fieldMeta?.[field]?.deviceId)
+      .forEach((field, index) => {
+        const labelKey = fieldLabelKey(field, exercise.fieldMeta?.[field]);
+        const inputId = `workshop-field-${index}`;
+        const input = element('input', {
+          id: inputId,
+          name: field,
+          type: 'text',
+          value: state.submission[field] ?? '',
+          autocomplete: 'off',
+          spellcheck: 'false',
+          'aria-describedby': `${inputId}-note`,
+          'data-focus-key': `field:${field}`,
+          onInput: (event) => {
+            state.submission[field] = event.currentTarget.value;
+          },
+        });
+        fields.append(element('div', { className: 'workshop-field' }, [
+          element('label', { for: inputId }, [i18n.t(labelKey)]),
+          input,
+          element('small', { id: `${inputId}-note` }, [i18n.t('workshop.editable')]),
+        ]));
       });
-      fields.append(element('div', { className: 'workshop-field' }, [
-        element('label', { for: inputId }, [i18n.t(labelKey)]),
-        input,
-        element('small', { id: `${inputId}-note` }, [i18n.t('workshop.editable')]),
-      ]));
-    });
-    return fields;
+    return fields.childElementCount > 0 ? fields : null;
   }
 
   function render() {
     const focusSnapshot = captureFocus(root);
+    topologyController?.destroy();
     root.dataset.exerciseSeed = state.seed;
     root.dataset.workshopPhase = state.phase;
     const hint = state.hintLevel > 0 ? getHint(exercise, state.validation, state.hintLevel) : null;
@@ -179,6 +187,17 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
         element('small', {}, [i18n.t('workshop.seed', { seed: state.seed })]),
       ]),
     ]);
+    topologyController = createTopology({
+      i18n,
+      devices: exercise.devices,
+      links: exercise.links,
+      selectedDeviceId: state.selectedDeviceId,
+      onSelect: (deviceId) => {
+        state.selectedDeviceId = deviceId;
+        render();
+      },
+    });
+    const selectedDevice = exercise.devices.find((device) => device.id === state.selectedDeviceId);
     const form = element('form', {
       className: 'workshop-form',
       onSubmit: (event) => {
@@ -190,6 +209,17 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
         element('p', { className: 'note-label' }, [i18n.t('course.objective')]),
         element('h2', {}, [i18n.t(`course.${definition.stageId}.objective`)]),
       ]),
+      topologyController.element,
+      renderDeviceConfig({
+        i18n,
+        device: selectedDevice,
+        devices: exercise.devices,
+        links: exercise.links,
+        submission: state.submission,
+        onChange: (field, value) => {
+          state.submission[field] = value;
+        },
+      }),
       renderFields(),
       element('div', { className: 'workshop-actions' }, [
         element('button', {
@@ -240,6 +270,7 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
     },
     destroy() {
       unsubscribe();
+      topologyController?.destroy();
       root.remove();
     },
   };
