@@ -135,6 +135,34 @@ describe('progress storage', () => {
     expect(stored.bestExamSeconds).toBe(640);
   });
 
+  it('requires an explicit non-empty string seed before accepting a best time', () => {
+    const malformedSeeds = [
+      { id: 'exam:undefined', seed: undefined },
+      { id: 'exam:', seed: '' },
+      { id: 'exam:   ', seed: '   ' },
+      { id: 'exam:42', seed: 42 },
+    ];
+
+    for (const malformed of malformedSeeds) {
+      const exam = { ...passedExam('exam:placeholder', 7), ...malformed };
+      if (malformed.seed === undefined) delete exam.seed;
+      expect(recordExam(loadProgress(memoryStorage()), exam).bestExamSeconds).toBeNull();
+      expect(loadProgress(memoryStorage(JSON.stringify({
+        version: 1,
+        locale: 'fr',
+        completed: {},
+        exams: [exam],
+        bestExamSeconds: 7,
+      }))).bestExamSeconds).toBeNull();
+    }
+
+    const valid = passedExam('exam:explicit-seed', 640);
+    const once = recordExam(loadProgress(memoryStorage()), valid);
+    const duplicate = recordExam(once, valid);
+    expect(once.bestExamSeconds).toBe(640);
+    expect(duplicate.exams).toEqual(once.exams);
+  });
+
   it('detaches nested progress data from caller-owned objects', () => {
     const nested = { attempts: 1, metadata: { tags: ['range'] } };
     const source = {

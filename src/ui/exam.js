@@ -247,6 +247,7 @@ function resultSummary(i18n, result, index) {
       element('span', {}, [i18n.t('exam.practiceAgain')]),
       ...remediationFor(codes).map((stage) => element('a', {
         href: `#/workshops/${REMEDIATION_ROUTES[stage]}`,
+        'data-focus-key': `exam:remediation:${index}:${stage}`,
       }, [i18n.t(`course.${stage}.title`)])),
     ]),
   ]);
@@ -371,6 +372,7 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
     topologyController?.destroy();
     topologyController = null;
     const snapshot = state.snapshot();
+    const finalizedNow = previousStatus === 'running' && snapshot.status !== 'running';
     root.dataset.examStatus = snapshot.status;
     root.dataset.activeMission = String(snapshot.index);
     renderedStatus = snapshot.status;
@@ -379,7 +381,7 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
       className: 'visually-hidden',
       'aria-live': 'polite',
       'aria-atomic': 'true',
-    }, snapshot.status === 'running' ? [] : [i18n.t('exam.resultAnnouncement')]);
+    }, finalizedNow ? [i18n.t('exam.resultAnnouncement')] : []);
     const header = element('header', { className: 'exam-header' }, [
       element('div', {}, [
         element('p', { className: 'eyebrow' }, [i18n.t('course.exam.eyebrow')]),
@@ -401,7 +403,6 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
       snapshot.status === 'running' && renderNavigation(snapshot),
       snapshot.status === 'running' ? renderRunning(snapshot) : renderResults(snapshot),
     ]);
-    const finalizedNow = previousStatus === 'running' && snapshot.status !== 'running';
     if (finalizedNow) {
       root.querySelector('[data-focus-key="exam:result"]')?.focus({ preventScroll: true });
     } else {

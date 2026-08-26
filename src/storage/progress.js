@@ -52,6 +52,9 @@ function validSeconds(value) {
 function isFullyPassedExam(exam) {
   return isRecord(exam)
     && typeof exam.id === 'string'
+    && typeof exam.seed === 'string'
+    && exam.seed.length > 0
+    && exam.seed === exam.seed.trim()
     && exam.id === `exam:${exam.seed}`
     && exam.status === 'complete'
     && exam.passed === true

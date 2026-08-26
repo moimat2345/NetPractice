@@ -27,10 +27,18 @@ test('hides all help while timed and finalizes exactly three results on expiry',
   const resultHeading = page.getByRole('heading', { name: /result|résultat/i });
   await expect(resultHeading).toBeVisible();
   await expect(resultHeading).toBeFocused();
-  await expect(page.locator('[aria-live="polite"]')).toContainText(/result|résultat|time|temps/i);
+  const finalAnnouncement = page.locator('[aria-live="polite"]');
+  await expect(finalAnnouncement).toContainText(/result|résultat|time|temps/i);
   await expect(page.locator('[data-mission-result]')).toHaveCount(3);
   await expect.poll(async () => page.evaluate(() =>
     JSON.parse(localStorage.getItem('subnet-notes-progress'))?.exams?.length)).toBe(1);
+
+  const remediation = page.locator('.exam-remediation a').first();
+  await remediation.focus();
+  await page.getByRole('button', { name: 'EN', exact: true }).evaluate((button) => button.click());
+  await expect(remediation).toBeFocused();
+  await expect(page.getByRole('heading', { name: /result/i })).not.toBeFocused();
+  await expect(page.locator('[aria-live="polite"]')).toBeEmpty();
 
   await page.reload();
   await page.clock.fastForward('15:00');
