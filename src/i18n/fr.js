@@ -201,6 +201,11 @@ export const fr = {
     'missing-return-path': 'Le paquet aller passe, mais le chemin de retour manque ({reason}).',
   },
   hint: {
+    defaultRoute: {
+      observe: 'Une route par défaut est le recours le moins spécifique, utilisé si aucune route plus précise ne correspond.',
+      method: 'Repère l’interface qui mène vers l’amont, puis choisis comme prochain saut le voisin directement joignable sur ce lien.',
+      nearSolution: 'La destination doit couvrir toutes les adresses IPv4 avec le préfixe le moins spécifique possible ; la passerelle est le voisin amont.',
+    },
     ipv4: {
       observe: 'Observe uniquement la forme de l’adresse demandée avant de penser au réseau.',
       method: 'Compte quatre octets décimaux séparés par trois points, puis contrôle chaque valeur entre 0 et 255.',

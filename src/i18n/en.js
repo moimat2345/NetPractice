@@ -201,6 +201,11 @@ export const en = {
     'missing-return-path': 'The outbound packet works, but the return path is missing ({reason}).',
   },
   hint: {
+    defaultRoute: {
+      observe: 'A default route is the least-specific fallback, used only when no more specific route matches.',
+      method: 'Identify the interface leading upstream, then choose the directly reachable neighbor on that link as the next hop.',
+      nearSolution: 'The destination must cover every IPv4 address with the least-specific possible prefix; the gateway is the upstream neighbor.',
+    },
     ipv4: {
       observe: 'Focus only on the requested address shape before thinking about its network.',
       method: 'Count four decimal octets separated by three dots, then check that every value is between 0 and 255.',

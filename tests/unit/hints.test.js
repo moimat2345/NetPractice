@@ -3,6 +3,49 @@ import { getHint } from '../../src/exercises/hints.js';
 import { getWorkshopGenerator } from '../../src/exercises/generators.js';
 import { validateSubmission } from '../../src/exercises/validators.js';
 import { curriculum } from '../../src/content/curriculum.js';
+import { parseIPv4 } from '../../src/core/ipv4.js';
+
+function recursiveKeyValues(value, path = [], entries = []) {
+  if (Array.isArray(value)) {
+    value.forEach((child, index) => recursiveKeyValues(child, [...path, String(index)], entries));
+    return entries;
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      entries.push({ path: [...path, '<key>'].join('.'), value: key });
+      recursiveKeyValues(child, [...path, key], entries);
+    }
+    return entries;
+  }
+  entries.push({ path: path.join('.'), value });
+  return entries;
+}
+
+function isEquivalentAnswer(candidate, answer, kind) {
+  if (kind === 'prefix') {
+    const expected = Number(String(answer).replace(/^\//, ''));
+    if (typeof candidate === 'number') return candidate === expected;
+    return typeof candidate === 'string'
+      && /^\/?(?:0|[1-9]|[12]\d|3[0-2])$/.test(candidate)
+      && Number(candidate.replace(/^\//, '')) === expected;
+  }
+  if (kind === 'address') {
+    const expected = parseIPv4(answer);
+    if (typeof candidate === 'number') return candidate === expected;
+    return typeof candidate === 'string' && parseIPv4(candidate) === expected;
+  }
+  return candidate === answer;
+}
+
+function leakedAnswerParams(exercise, hints) {
+  const candidates = recursiveKeyValues(hints.flatMap((hint) => hint.params));
+  return Object.entries(exercise.solution).flatMap(([field, answer]) => {
+    const kind = exercise.fieldMeta?.[field]?.kind;
+    return candidates
+      .filter((candidate) => isEquivalentAnswer(candidate.value, answer, kind))
+      .map((candidate) => ({ field, answer, equivalent: candidate.value, path: candidate.path }));
+  });
+}
 
 describe('getHint', () => {
   it('strengthens gateway hints with calculated subnet boundaries without returning the completed answer', () => {
@@ -76,6 +119,7 @@ describe('getHint', () => {
     const mask = getWorkshopGenerator('mask-conversion-1')({ seed: 'hint-mask' });
     const range = getWorkshopGenerator('subnet-range-1')({ seed: 'hint-range' });
     const route = getWorkshopGenerator('packet-path-3')({ seed: 'hint-route' });
+    const defaultRoute = getWorkshopGenerator('default-route-2')({ seed: 'hint-default-route' });
     const gateway = getWorkshopGenerator('valid-gateway-2')({ seed: 'hint-gateway' });
 
     expect(getHint(mask, null, 2)).toMatchObject({
@@ -93,6 +137,14 @@ describe('getHint', () => {
     expect(getHint(mask, null, 1).params).toMatchObject({ dottedMask: mask.facts.clue });
     expect(getHint(range, null, 1).params).toMatchObject({ prefix: range.facts.prefix });
     expect(getHint(route, null, 1).params).toMatchObject({ source: 'alpha', destination: 'beta' });
+    expect(getHint(mask, null, 2).params).not.toHaveProperty('prefix');
+    expect(getHint(route, null, 2).params).not.toHaveProperty('prefix');
+    expect([1, 2, 3].map((level) => getHint(defaultRoute, null, level).key)).toEqual([
+      'hint.defaultRoute.observe',
+      'hint.defaultRoute.method',
+      'hint.defaultRoute.nearSolution',
+    ]);
+    expect(getHint(defaultRoute, null, 3).params).not.toHaveProperty('prefix');
     expect(getHint(gateway, null, 2)).toMatchObject({
       key: 'hint.gateway.method',
       params: { localAddress: expect.stringMatching(/^10\./), prefix: gateway.facts.prefix },
@@ -133,13 +185,28 @@ describe('getHint', () => {
     expect(getHint(route, wrongRoute, 2).key).toBe('hint.route.method');
   });
 
-  it('does not expose any complete curriculum answer before validation', () => {
+  it('does not expose normalized or equivalent curriculum answers in raw hint params', () => {
     for (const id of curriculum.flatMap((stage) => stage.workshops)) {
       const exercise = getWorkshopGenerator(id)({ seed: `non-leak-${id}` });
-      const renderedHints = JSON.stringify([1, 2, 3].map((level) => getHint(exercise, null, level)));
-      for (const answer of Object.values(exercise.solution).filter((value) => value.length >= 5)) {
-        expect(renderedHints, `${id} leaked ${answer}`).not.toContain(`"${answer}"`);
-      }
+      const hints = [1, 2, 3].map((level) => getHint(exercise, null, level));
+      expect(leakedAnswerParams(exercise, hints), id).toEqual([]);
     }
+  });
+
+  it('detects numeric and string equivalents for prefix and IPv4 answers recursively', () => {
+    const exercise = {
+      solution: { prefix: '/26', address: '10.0.0.1' },
+      fieldMeta: { prefix: { kind: 'prefix' }, address: { kind: 'address' } },
+    };
+
+    expect(leakedAnswerParams(exercise, [{ params: { nested: { prefix: 26 } } }])).toEqual([
+      { field: 'prefix', answer: '/26', equivalent: 26, path: '0.nested.prefix' },
+    ]);
+    expect(leakedAnswerParams(exercise, [{ params: { '/26': 'safe' } }])).toEqual([
+      { field: 'prefix', answer: '/26', equivalent: '/26', path: '0.<key>' },
+    ]);
+    expect(leakedAnswerParams(exercise, [{ params: { address: 167772161 } }])).toEqual([
+      { field: 'address', answer: '10.0.0.1', equivalent: 167772161, path: '0.address' },
+    ]);
   });
 });

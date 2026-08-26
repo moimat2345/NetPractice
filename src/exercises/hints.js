@@ -1,5 +1,5 @@
 import { formatIPv4, parseIPv4 } from '../core/ipv4.js';
-import { broadcastOf, networkOf } from '../core/subnet.js';
+import { broadcastOf, networkOf, parseMask } from '../core/subnet.js';
 
 const hintKeys = {
   'unreachable-gateway': ['hint.gateway.observe', 'hint.gateway.method', 'hint.gateway.nearSolution'],
@@ -7,7 +7,7 @@ const hintKeys = {
   'missing-return-path': ['hint.return.observe', 'hint.return.method', 'hint.return.nearSolution'],
 };
 
-const familyKeys = Object.fromEntries(['ipv4', 'mask', 'range', 'route', 'gateway', 'subnet', 'return', 'generic']
+const familyKeys = Object.fromEntries(['ipv4', 'mask', 'range', 'route', 'defaultRoute', 'gateway', 'subnet', 'return', 'generic']
   .map((family) => [family, [
     `hint.${family}.observe`,
     `hint.${family}.method`,
@@ -27,6 +27,7 @@ function hintFamily(exercise, diagnostic) {
   if (diagnostic?.code === 'unreachable-gateway') return 'gateway';
   if (diagnostic?.code === 'different-subnet') return 'subnet';
   if (diagnostic?.code === 'missing-return-path') return 'return';
+  if (exercise.correctionStrategy === 'default-route') return 'defaultRoute';
   if (exercise.correctionStrategy === 'return-trace') return 'return';
   if (['wrong-route-destination', 'wrong-default-gateway'].includes(diagnostic?.code)) return 'route';
 
@@ -118,6 +119,46 @@ function deriveNearSolutionParams(diagnostic) {
   };
 }
 
+function answerDescriptors(exercise) {
+  return Object.entries(exercise.solution ?? {}).map(([field, answer]) => {
+    const kind = exercise.fieldMeta?.[field]?.kind;
+    if (kind === 'prefix') return { kind, value: parseMask(answer)?.prefix };
+    if (kind === 'address') return { kind, value: parseIPv4(answer) };
+    return { kind: 'value', value: answer };
+  }).filter(({ value }) => value !== null && value !== undefined);
+}
+
+function isAnswerEquivalent(candidate, answer) {
+  if (answer.kind === 'prefix') {
+    if (typeof candidate === 'number') return candidate === answer.value;
+    const normalized = typeof candidate === 'string' ? candidate.trim() : '';
+    return /^\/?(?:0|[1-9]|[12]\d|3[0-2])$/.test(normalized)
+      && Number(normalized.replace(/^\//, '')) === answer.value;
+  }
+  if (answer.kind === 'address') {
+    if (typeof candidate === 'number') return candidate === answer.value;
+    return typeof candidate === 'string' && parseIPv4(candidate.trim()) === answer.value;
+  }
+  return candidate === answer.value;
+}
+
+const omitted = Symbol('omitted-hint-answer');
+
+function withoutAnswerValues(value, answers) {
+  if (answers.some((answer) => isAnswerEquivalent(value, answer))) return omitted;
+  if (Array.isArray(value)) {
+    return value.map((entry) => withoutAnswerValues(entry, answers)).filter((entry) => entry !== omitted);
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).flatMap(([key, entry]) => {
+      if (answers.some((answer) => isAnswerEquivalent(key, answer))) return [];
+      const safeEntry = withoutAnswerValues(entry, answers);
+      return safeEntry === omitted ? [] : [[key, safeEntry]];
+    }));
+  }
+  return value;
+}
+
 export function getHint(exercise, validation, level) {
   if (![1, 2, 3].includes(level)) throw new RangeError('Hint level must be 1, 2, or 3');
   const diagnostic = validation?.diagnostics?.[0];
@@ -146,5 +187,8 @@ export function getHint(exercise, validation, level) {
           ...context,
         };
   }
-  return { key: keys[level - 1], params };
+  return {
+    key: keys[level - 1],
+    params: withoutAnswerValues(params, answerDescriptors(exercise)),
+  };
 }

@@ -23,6 +23,9 @@ const taskSixDiagnosticKeys = [
 ];
 
 const taskSixHintKeys = [
+  'hint.defaultRoute.observe',
+  'hint.defaultRoute.method',
+  'hint.defaultRoute.nearSolution',
   'hint.gateway.observe',
   'hint.gateway.method',
   'hint.gateway.nearSolution',
