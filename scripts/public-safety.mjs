@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
-import { extname, relative, resolve, sep } from 'node:path';
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+} from 'node:fs';
+import { basename, extname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const forbidden = [
@@ -23,22 +31,64 @@ function fileRecord(path, root) {
   return { absolutePath: path, relativePath: normalizedRelativePath(root, path) };
 }
 
-export function listFilesRecursively(rootPath) {
-  const root = resolve(rootPath);
-  if (!existsSync(root)) return [];
-  const files = [];
+function reportedPath(root, path) {
+  return normalizedRelativePath(root, path) || basename(root);
+}
 
-  function visit(path) {
-    const entry = lstatSync(path);
-    if (entry.isSymbolicLink()) return;
-    if (entry.isDirectory()) {
-      readdirSync(path).sort().forEach((name) => visit(resolve(path, name)));
-      return;
-    }
-    if (entry.isFile()) files.push(fileRecord(path, root));
+function throwUnsafeFilesystemEntries(paths) {
+  const uniquePaths = [...new Set(paths)].sort();
+  throw new Error(`Unsafe public filesystem entries:\n${uniquePaths.join('\n')}`);
+}
+
+export function listFilesRecursively(rootPath, operations = {}) {
+  const root = resolve(rootPath);
+  const inspect = operations.lstatSync ?? lstatSync;
+  const list = operations.readdirSync ?? readdirSync;
+  const files = [];
+  const unsafe = [];
+
+  let rootEntry;
+  try {
+    rootEntry = inspect(root);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throwUnsafeFilesystemEntries([basename(root)]);
   }
 
-  visit(root);
+  function visit(path, knownEntry) {
+    let entry = knownEntry;
+    if (!entry) {
+      try {
+        entry = inspect(path);
+      } catch {
+        unsafe.push(reportedPath(root, path));
+        return;
+      }
+    }
+    if (entry.isSymbolicLink()) {
+      unsafe.push(reportedPath(root, path));
+      return;
+    }
+    if (entry.isDirectory()) {
+      let names;
+      try {
+        names = list(path);
+      } catch {
+        unsafe.push(reportedPath(root, path));
+        return;
+      }
+      names.sort().forEach((name) => visit(resolve(path, name)));
+      return;
+    }
+    if (entry.isFile()) {
+      files.push(fileRecord(path, root));
+      return;
+    }
+    unsafe.push(reportedPath(root, path));
+  }
+
+  visit(root, rootEntry);
+  if (unsafe.length > 0) throwUnsafeFilesystemEntries(unsafe);
   return files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 }
 
@@ -166,14 +216,65 @@ function isForbiddenReference(reference) {
     || /(^|\/)en\.subject _netpractice\.pdf$/.test(normalized);
 }
 
-function rejectedFileNames(files, predicate) {
-  return files.filter((file) => {
+function readableFileRecords(files, operations = {}) {
+  const inspect = operations.lstatSync ?? lstatSync;
+  const open = operations.openSync ?? openSync;
+  const inspectOpenFile = operations.fstatSync ?? fstatSync;
+  const read = operations.readFileSync ?? readFileSync;
+  const close = operations.closeSync ?? closeSync;
+  const records = [];
+  const unsafe = [];
+
+  files.forEach((file) => {
+    let entry;
     try {
-      return predicate(readFileSync(file.absolutePath, 'utf8'), extname(file.relativePath).toLowerCase());
+      entry = inspect(file.absolutePath);
     } catch {
-      return false;
+      unsafe.push(file.relativePath);
+      return;
     }
-  }).map((file) => file.relativePath);
+    if (!entry.isFile() || entry.isSymbolicLink()) {
+      unsafe.push(file.relativePath);
+      return;
+    }
+
+    let descriptor;
+    let text;
+    let failed = false;
+    try {
+      descriptor = open(file.absolutePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+      if (!inspectOpenFile(descriptor).isFile()) {
+        failed = true;
+      } else {
+        text = read(descriptor, 'utf8');
+      }
+    } catch {
+      failed = true;
+    } finally {
+      if (descriptor !== undefined) {
+        try {
+          close(descriptor);
+        } catch {
+          failed = true;
+        }
+      }
+    }
+
+    if (failed) {
+      unsafe.push(file.relativePath);
+      return;
+    }
+    records.push({ ...file, text });
+  });
+
+  if (unsafe.length > 0) throwUnsafeFilesystemEntries(unsafe);
+  return records;
+}
+
+function rejectedFileNames(files, predicate, operations) {
+  return readableFileRecords(files, operations)
+    .filter((file) => predicate(file.text, extname(file.relativePath).toLowerCase()))
+    .map((file) => file.relativePath);
 }
 
 export function assertPublicPathsSafe(paths) {
@@ -183,18 +284,18 @@ export function assertPublicPathsSafe(paths) {
   }
 }
 
-export function assertExecutableReferencesSafe(files) {
+export function assertExecutableReferencesSafe(files, operations = {}) {
   const rejected = rejectedFileNames(files, (text, extension) =>
-    executableReferences(text, extension).some(isForbiddenReference));
+    executableReferences(text, extension).some(isForbiddenReference), operations);
   if (rejected.length > 0) {
     throw new Error(`Forbidden executable references in:\n${rejected.join('\n')}`);
   }
 }
 
-export function assertEmittedTextSafe(files) {
+export function assertEmittedTextSafe(files, operations = {}) {
   const rejected = rejectedFileNames(files, (text, extension) =>
     emittedTextExtensions.has(extension)
-      && (text.includes('net_practice') || text.includes('en.subject _netpractice.pdf')));
+      && (text.includes('net_practice') || text.includes('en.subject _netpractice.pdf')), operations);
   if (rejected.length > 0) {
     throw new Error(`Forbidden official names in emitted files:\n${rejected.join('\n')}`);
   }
@@ -207,8 +308,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     .filter(Boolean);
   assertPublicPathsSafe(tracked);
   const trackedFiles = tracked
-    .map((path) => ({ absolutePath: resolve(root, path), relativePath: path }))
-    .filter((file) => existsSync(file.absolutePath));
+    .map((path) => ({ absolutePath: resolve(root, path), relativePath: path }));
   assertExecutableReferencesSafe(trackedFiles);
 
   const emittedFiles = listFilesRecursively(resolve(root, 'dist'));

@@ -1,4 +1,11 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  lstatSync,
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -15,6 +22,15 @@ function fixtureDirectory() {
   const directory = mkdtempSync(join(tmpdir(), 'subnet-notes-public-safety-'));
   temporaryDirectories.push(directory);
   return directory;
+}
+
+function errorMessage(action) {
+  try {
+    action();
+    return '';
+  } catch (error) {
+    return error.message;
+  }
 }
 
 afterEach(() => {
@@ -226,5 +242,72 @@ describe('assertPublicPathsSafe', () => {
     ].join('\n'));
 
     expect(() => assertExecutableReferencesSafe(listFilesRecursively(root))).not.toThrow();
+  });
+
+  it('rejects emitted symlinks without following or naming their target', () => {
+    const root = fixtureDirectory();
+    writeFileSync(join(root, 'clean-target.js'), 'export const lesson = "original";');
+    symlinkSync('clean-target.js', join(root, 'linked-asset.js'));
+
+    const message = errorMessage(() => listFilesRecursively(root));
+
+    expect(message).toMatch(/linked-asset\.js/);
+    expect(message).not.toContain('clean-target.js');
+    expect(message).not.toContain('original');
+  });
+
+  it('rejects a directory where a regular file record is expected', () => {
+    const root = fixtureDirectory();
+    mkdirSync(join(root, 'unexpected-entry'));
+
+    const message = errorMessage(() => assertExecutableReferencesSafe([{
+      absolutePath: join(root, 'unexpected-entry'),
+      relativePath: 'assets/app.js',
+    }]));
+
+    expect(message).toMatch(/assets\/app\.js/);
+    expect(message).not.toContain(root);
+  });
+
+  it('fails closed on an injected recursive stat error and reports only the path', () => {
+    const root = fixtureDirectory();
+    writeFileSync(join(root, 'app.js'), 'export const safe = true;');
+
+    const message = errorMessage(() => listFilesRecursively(root, {
+      lstatSync(path) {
+        if (path.endsWith('app.js')) throw new Error('must-not-leak-stat-details');
+        return lstatSync(path);
+      },
+    }));
+
+    expect(message).toMatch(/app\.js/);
+    expect(message).not.toContain('must-not-leak-stat-details');
+    expect(message).not.toContain(root);
+  });
+
+  it('fails closed on an injected read error and reports only the file name', () => {
+    const root = fixtureDirectory();
+    writeFileSync(join(root, 'app.js'), 'export const safe = true;');
+    const files = listFilesRecursively(root);
+
+    const message = errorMessage(() => assertExecutableReferencesSafe(files, {
+      readFileSync() {
+        throw new Error('must-not-leak-read-details');
+      },
+    }));
+
+    expect(message).toMatch(/app\.js/);
+    expect(message).not.toContain('must-not-leak-read-details');
+    expect(message).not.toContain(root);
+  });
+
+  it('allows an absent build directory and ordinary regular files', () => {
+    const root = fixtureDirectory();
+    const absent = join(root, 'dist');
+    expect(listFilesRecursively(absent)).toEqual([]);
+
+    writeFileSync(join(root, 'index.html'), '<script src="/assets/app.js"></script>');
+    const files = listFilesRecursively(root);
+    expect(() => assertExecutableReferencesSafe(files)).not.toThrow();
   });
 });
