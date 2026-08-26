@@ -14,6 +14,9 @@ export const fr = {
     french: 'FR',
     english: 'EN',
   },
+  progress: {
+    summary: '{completed} étapes terminées sur {total}',
+  },
   course: {
     eyebrow: 'Parcours pratique IPv4',
     title: 'Construis ton raisonnement, paquet après paquet.',
@@ -23,8 +26,51 @@ export const fr = {
     method: 'Méthode',
     practice: 'À toi de jouer',
     completed: 'Terminé',
+    next: 'À faire maintenant',
     locked: 'À venir',
     duration: '{minutes} min',
+  },
+  home: {
+    backHome: 'Retour à l’accueil de Subnet Notes',
+    startFirst: 'Commencer le premier atelier',
+    openStage: 'Ouvrir l’étape',
+    pathLabel: 'Six étapes, un seul fil',
+    pathTitle: 'Ton carnet de progression',
+    pathIntro: 'Chaque étape ajoute une pièce au trajet du paquet. Avance dans l’ordre, puis reviens sur les calculs qui résistent.',
+    method: {
+      label: 'Méthode de poche',
+      title: 'Suis toujours le paquet.',
+      local: 'Même réseau ou sortie locale ?',
+      gateway: 'La passerelle est-elle joignable ?',
+      route: 'Quelle route correspond ?',
+      return: 'Le retour sait-il revenir ?',
+    },
+  },
+  path: {
+    ipv4: {
+      title: 'Adresses IPv4',
+      summary: 'Reconnais les octets valides et lis une adresse sans te perdre dans le binaire.',
+    },
+    subnets: {
+      title: 'Masques et réseaux',
+      summary: 'Trouve le réseau, la diffusion et la plage d’hôtes à partir d’un préfixe.',
+    },
+    local: {
+      title: 'Communication locale',
+      summary: 'Décide si deux interfaces sont voisines et comprends ce que relie un commutateur.',
+    },
+    gateways: {
+      title: 'Routeurs et passerelles',
+      summary: 'Choisis une sortie directement joignable et suis le premier saut hors du réseau.',
+    },
+    routing: {
+      title: 'Tables de routage',
+      summary: 'Lis destination, préfixe et prochain saut, puis vérifie le chemin de retour.',
+    },
+    exam: {
+      title: 'Missions complètes',
+      summary: 'Assemble les réflexes sur des réseaux originaux, puis passe trois missions chronométrées.',
+    },
   },
   workshop: {
     focused: 'Exercice ciblé',

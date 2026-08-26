@@ -6,13 +6,16 @@ export const en = {
     description: 'Interactive workshops for reasoning about IPv4, subnets, and routing.',
   },
   nav: {
-    curriculum: 'Curriculum',
+    curriculum: 'Learning path',
     workshop: 'Workshop',
     exam: 'Mock exam',
     progress: 'Progress',
     language: 'Language',
     french: 'FR',
     english: 'EN',
+  },
+  progress: {
+    summary: '{completed} of {total} stages complete',
   },
   course: {
     eyebrow: 'Hands-on IPv4 path',
@@ -23,8 +26,51 @@ export const en = {
     method: 'Method',
     practice: 'Your turn',
     completed: 'Complete',
+    next: 'Up next',
     locked: 'Coming up',
     duration: '{minutes} min',
+  },
+  home: {
+    backHome: 'Back to the Subnet Notes home page',
+    startFirst: 'Start the first workshop',
+    openStage: 'Open stage',
+    pathLabel: 'Six stages, one thread',
+    pathTitle: 'Your progress notebook',
+    pathIntro: 'Each stage adds one part of the packet journey. Work in order, then revisit the calculations that still resist.',
+    method: {
+      label: 'Pocket method',
+      title: 'Always follow the packet.',
+      local: 'Same network or local exit?',
+      gateway: 'Is the gateway reachable?',
+      route: 'Which route matches?',
+      return: 'Can the reply find its way back?',
+    },
+  },
+  path: {
+    ipv4: {
+      title: 'IPv4 addresses',
+      summary: 'Recognize valid octets and read an address without getting lost in binary.',
+    },
+    subnets: {
+      title: 'Masks and networks',
+      summary: 'Find the network, broadcast, and host range from a prefix.',
+    },
+    local: {
+      title: 'Local communication',
+      summary: 'Decide whether interfaces are neighbors and understand what a switch connects.',
+    },
+    gateways: {
+      title: 'Routers and gateways',
+      summary: 'Choose a directly reachable exit and follow the first hop beyond the network.',
+    },
+    routing: {
+      title: 'Routing tables',
+      summary: 'Read destination, prefix, and next hop, then verify the return path.',
+    },
+    exam: {
+      title: 'Complete missions',
+      summary: 'Combine the reflexes on original networks, then solve three timed missions.',
+    },
   },
   workshop: {
     focused: 'Focused drill',

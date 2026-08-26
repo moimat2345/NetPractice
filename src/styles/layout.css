@@ -1,0 +1,177 @@
+.app-frame {
+  display: grid;
+  min-height: 100vh;
+  grid-template-rows: auto 1fr auto;
+}
+
+.site-header {
+  position: relative;
+  z-index: 10;
+  border-bottom: 1px solid var(--rule-strong);
+  background: rgb(255 253 248 / 96%);
+}
+
+.header-inner {
+  display: grid;
+  width: min(100%, 1600px);
+  min-height: 74px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  align-items: center;
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.app-body {
+  display: grid;
+  width: min(100%, 1600px);
+  margin: 0 auto;
+  grid-template-columns: 270px minmax(0, 1fr);
+}
+
+.curriculum-sidebar {
+  min-width: 0;
+  padding: 2.25rem 1.75rem 3rem 2rem;
+  border-right: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--sheet) 68%, var(--paper));
+}
+
+.curriculum-nav {
+  position: sticky;
+  top: 2rem;
+}
+
+.route-outlet {
+  min-width: 0;
+}
+
+.home-view {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  padding: clamp(3rem, 7vw, 7rem) clamp(1.5rem, 5vw, 5.5rem) 6rem;
+}
+
+.home-hero {
+  display: grid;
+  padding-bottom: clamp(3.5rem, 7vw, 6rem);
+  align-items: end;
+  gap: clamp(2.5rem, 7vw, 6.5rem);
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.72fr);
+}
+
+.path-section {
+  display: grid;
+  padding-top: clamp(2.5rem, 5vw, 4.5rem);
+  border-top: 1px solid var(--rule-strong);
+  gap: clamp(2rem, 5vw, 5rem);
+  grid-template-columns: minmax(220px, 0.62fr) minmax(0, 1.38fr);
+}
+
+.section-heading {
+  max-width: 32rem;
+}
+
+.site-footer {
+  border-top: 1px solid var(--rule);
+  background: var(--sheet);
+}
+
+.footer-inner {
+  display: flex;
+  width: min(100%, 1600px);
+  margin: 0 auto;
+  padding: 1.4rem 2rem;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.footer-inner p {
+  margin: 0;
+  color: var(--muted-ink);
+  font-size: 0.78rem;
+}
+
+.footer-inner p:first-child {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+@media (max-width: 1179px) {
+  .app-frame[data-view="workshop"] .app-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-frame[data-view="workshop"] .curriculum-sidebar {
+    display: none;
+  }
+
+  .home-view {
+    padding-inline: clamp(1.5rem, 5vw, 4rem);
+  }
+}
+
+@media (max-width: 900px) {
+  .home-hero,
+  .path-section {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .method-note {
+    max-width: 38rem;
+  }
+}
+
+@media (max-width: 759px) {
+  .header-inner {
+    min-height: 68px;
+    padding: 0.4rem 1rem;
+    grid-template-columns: 1fr auto;
+    row-gap: 0.2rem;
+  }
+
+  .wordmark {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .language-toggle {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .header-inner > .header-progress {
+    width: 168px;
+    min-width: 0;
+    justify-self: center;
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .app-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .curriculum-sidebar {
+    display: none;
+  }
+
+  .home-view {
+    padding: 3.25rem 1.1rem 4rem;
+  }
+
+  .footer-inner {
+    display: grid;
+    padding-inline: 1.1rem;
+    gap: 0.45rem;
+  }
+}
+
+@media (max-width: 420px) {
+  h1 {
+    font-size: clamp(2.5rem, 14vw, 3.5rem);
+  }
+
+  .home-hero {
+    gap: 2.25rem;
+  }
+}

@@ -1,0 +1,364 @@
+.wordmark {
+  width: max-content;
+  color: var(--ink);
+  font-size: 1.3rem;
+  letter-spacing: -0.03em;
+  text-decoration: none;
+}
+
+.wordmark::after {
+  color: var(--accent);
+  content: "/24";
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.62em;
+  letter-spacing: -0.04em;
+  vertical-align: super;
+}
+
+.header-progress {
+  display: grid;
+  min-width: 168px;
+  align-items: center;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.55rem;
+}
+
+.status-mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--network-link);
+  grid-row: 1 / 3;
+}
+
+.progress-text {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.progress-copy {
+  color: var(--muted-ink);
+}
+
+.progress-value {
+  color: var(--network-link);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.progress-meter {
+  width: 100%;
+  height: 3px;
+  border: 0;
+  appearance: none;
+  grid-column: 2;
+}
+
+.progress-meter::-webkit-progress-bar {
+  background: var(--rule);
+}
+
+.progress-meter::-webkit-progress-value {
+  background: var(--network-link);
+}
+
+.progress-meter::-moz-progress-bar {
+  background: var(--network-link);
+}
+
+.language-toggle {
+  display: flex;
+  justify-self: end;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.language-option {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted-ink);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.language-option[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.language-divider {
+  color: var(--rule-strong);
+  font-size: 0.75rem;
+}
+
+.sidebar-heading,
+.eyebrow,
+.note-label,
+.ledger-status {
+  margin-bottom: 1rem;
+  color: var(--accent-dark);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.curriculum-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.curriculum-list li {
+  border-top: 1px solid var(--rule);
+}
+
+.curriculum-list li:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.curriculum-link {
+  display: grid;
+  min-height: 62px;
+  padding: 0.75rem 0.3rem;
+  align-items: center;
+  color: var(--muted-ink);
+  grid-template-columns: 2rem 1fr auto;
+  gap: 0.55rem;
+  text-decoration: none;
+}
+
+.curriculum-link:hover,
+.curriculum-link.is-current {
+  color: var(--ink);
+}
+
+.curriculum-link.is-current {
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.curriculum-link.is-complete .curriculum-state {
+  color: var(--network-link);
+}
+
+.curriculum-index,
+.curriculum-state,
+.method-index,
+.ledger-index {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+.curriculum-index {
+  color: var(--rule-strong);
+  font-size: 0.7rem;
+}
+
+.curriculum-copy {
+  display: grid;
+  line-height: 1.2;
+}
+
+.curriculum-copy strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.curriculum-copy small {
+  margin-top: 0.2rem;
+  color: var(--muted-ink);
+  font-size: 0.64rem;
+}
+
+.curriculum-state {
+  color: var(--accent);
+}
+
+.hero-intro {
+  max-width: 55ch;
+  margin-bottom: 2rem;
+  color: var(--muted-ink);
+  font-size: clamp(1rem, 1.4vw, 1.18rem);
+}
+
+.button {
+  display: inline-flex;
+  min-height: 46px;
+  padding: 0.72rem 1.15rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.button-primary {
+  background: var(--accent);
+  color: var(--sheet);
+  box-shadow: 4px 4px 0 var(--accent-soft);
+}
+
+.button-primary:hover {
+  background: var(--accent-dark);
+}
+
+.method-note {
+  position: relative;
+  padding: 1.4rem 1.4rem 1.25rem 2rem;
+  border: 1px solid var(--rule-strong);
+  background: var(--sheet);
+  box-shadow: var(--shadow);
+}
+
+.method-note::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 1rem;
+  width: 1px;
+  background: var(--accent-soft);
+  content: "";
+}
+
+.method-note h2 {
+  max-width: 11ch;
+  font-size: 1.55rem;
+}
+
+.packet-method {
+  margin: 1.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.packet-method li {
+  display: grid;
+  min-height: 42px;
+  padding: 0.65rem 0;
+  align-items: center;
+  border-top: 1px solid var(--rule);
+  color: var(--muted-ink);
+  font-size: 0.78rem;
+  grid-template-columns: 1.75rem 1fr;
+}
+
+.method-index {
+  color: var(--network-link);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.section-heading > p:last-child {
+  max-width: 40ch;
+  color: var(--muted-ink);
+}
+
+.learning-ledger {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule-strong);
+  list-style: none;
+}
+
+.learning-ledger::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3.35rem;
+  width: 1px;
+  background: var(--accent-soft);
+  content: "";
+}
+
+.ledger-row {
+  position: relative;
+  display: grid;
+  min-height: 132px;
+  padding: 1.35rem 0;
+  align-items: center;
+  border-bottom: 1px solid var(--rule);
+  grid-template-columns: 3.4rem minmax(0, 1fr) auto;
+  gap: 1.25rem;
+}
+
+.ledger-row.is-current::after {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 0;
+  width: 3px;
+  background: var(--accent);
+  content: "";
+}
+
+.ledger-index {
+  color: var(--rule-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.ledger-status {
+  margin-bottom: 0.35rem;
+}
+
+.is-complete .ledger-status {
+  color: var(--network-link);
+}
+
+.ledger-copy p:last-child {
+  max-width: 52ch;
+  margin-bottom: 0;
+  color: var(--muted-ink);
+  font-size: 0.84rem;
+}
+
+.ledger-link {
+  display: inline-flex;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+  align-items: center;
+  color: var(--accent-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-underline-offset: 0.24em;
+}
+
+.ledger-link:hover {
+  color: var(--ink);
+}
+
+@media (max-width: 560px) {
+  .method-note {
+    padding-right: 1rem;
+    padding-left: 1.65rem;
+  }
+
+  .learning-ledger::before {
+    left: 2.4rem;
+  }
+
+  .ledger-row {
+    padding: 1.2rem 0;
+    grid-template-columns: 2.4rem minmax(0, 1fr);
+    gap: 0.8rem;
+  }
+
+  .ledger-link {
+    width: max-content;
+    margin-top: 0.4rem;
+    padding-left: 0;
+    grid-column: 2;
+  }
+}
