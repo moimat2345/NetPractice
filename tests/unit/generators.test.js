@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { isUsableHost } from '../../src/core/subnet.js';
+import { formatIPv4, parseIPv4 } from '../../src/core/ipv4.js';
+import {
+  broadcastOf,
+  isUsableHost,
+  networkOf,
+  sameSubnet,
+  usableRange,
+} from '../../src/core/subnet.js';
 import { validateRoundTrip } from '../../src/core/routing.js';
 import { generateFocusedExercise, generateMission } from '../../src/exercises/generators.js';
 import { assertExercise } from '../../src/exercises/schema.js';
@@ -16,6 +23,62 @@ function generatedEditableFields(exercise) {
       ...(route.editable.gateway ? [`${device.id}.routes.${route.id}.gateway`] : []),
     ]),
   ]);
+}
+
+function assertModelEditableField(exercise, field) {
+  const [deviceId, section, entryId, property] = field.split('.');
+  const device = exercise.devices.find((candidate) => candidate.id === deviceId);
+  const meta = exercise.fieldMeta[field];
+  const isInterface = section === 'interfaces';
+  const entries = isInterface ? device?.interfaces : device?.routes;
+  const entry = entries?.find((candidate) => candidate.id === entryId);
+
+  expect(device).toBeDefined();
+  expect(['interfaces', 'routes']).toContain(section);
+  expect(entry).toBeDefined();
+  expect(meta.deviceId).toBe(deviceId);
+  expect(meta[isInterface ? 'interfaceId' : 'routeId']).toBe(entryId);
+  expect(meta[isInterface ? 'routeId' : 'interfaceId']).toBeUndefined();
+  expect(meta.kind).toBe(property === 'prefix' ? 'prefix' : 'address');
+  expect(meta.role).toBe(isInterface
+    ? (property === 'prefix' ? 'mask' : 'host')
+    : ({ destination: 'route-destination', prefix: 'route-prefix', gateway: 'gateway' }[property]));
+  expect(exercise.solution[field]).toBe(property === 'prefix'
+    ? `/${entry.prefix}`
+    : formatIPv4(entry[property]));
+
+  if (isInterface || property !== 'gateway') {
+    expect(meta.prefix).toBe(entry.prefix);
+  } else {
+    const gatewayInterface = device.interfaces.find((candidate) =>
+      Number.isInteger(candidate.address)
+      && sameSubnet(candidate.address, entry.gateway, candidate.prefix));
+    expect(gatewayInterface).toBeDefined();
+    expect(meta.prefix).toBe(gatewayInterface.prefix);
+  }
+}
+
+function assertRangeAnswerSemantics(exercise) {
+  const { prefix, network, broadcast } = exercise.facts;
+  const usable = usableRange(network, prefix);
+  const expected = {
+    'range.network': { role: 'network', value: networkOf(network, prefix) },
+    'range.broadcast': { role: 'broadcast', value: broadcastOf(network, prefix) },
+    'range.first-host': { role: 'first-host', value: usable.first },
+    'range.last-host': { role: 'last-host', value: usable.last },
+  };
+
+  expect(broadcast).toBe(expected['range.broadcast'].value);
+  for (const field of exercise.editableFields) {
+    const answer = expected[field];
+    expect(answer).toBeDefined();
+    expect(exercise.fieldMeta[field]).toMatchObject({
+      kind: 'address',
+      role: answer.role,
+      prefix,
+    });
+    expect(exercise.solution[field]).toBe(formatIPv4(answer.value));
+  }
 }
 
 describe('exercise generators', () => {
@@ -40,10 +103,23 @@ describe('exercise generators', () => {
 
         expect(() => assertExercise(exercise)).not.toThrow();
         expect(exercise.editableFields.length).toBeGreaterThan(0);
-        for (const field of exercise.editableFields) {
-          expect(exercise.initial[field]).toBe('');
-          expect(exercise.solution[field]).toEqual(expect.any(String));
-          expect(exercise.fieldMeta[field]).toMatchObject({ kind: expect.any(String) });
+        if (concept === 'host-range' || concept === 'subnet-range') {
+          assertRangeAnswerSemantics(exercise);
+        } else {
+          const field = exercise.editableFields[0];
+          assertModelEditableField(exercise, field);
+          const host = exercise.devices.find((device) => device.id === 'host-a').interfaces[0];
+          const router = exercise.devices.find((device) => device.id === 'router').interfaces[0];
+          const answer = parseIPv4(exercise.solution[field]);
+
+          expect(answer).not.toBeNull();
+          expect(isUsableHost(answer, host.prefix)).toBe(true);
+          if (concept === 'same-subnet') {
+            expect(sameSubnet(answer, router.address, host.prefix)).toBe(true);
+          } else {
+            expect(sameSubnet(host.address, answer, host.prefix)).toBe(true);
+            expect(router.address).toBe(answer);
+          }
         }
       }
     }
@@ -77,9 +153,7 @@ describe('exercise generators', () => {
       }
       for (const field of exercise.editableFields) {
         expect(exercise.initial[field]).toBe('');
-        expect(exercise.solution[field]).toEqual(expect.any(String));
-        expect(exercise.solution[field]).not.toBe('');
-        expect(exercise.fieldMeta[field]).toMatchObject({ kind: expect.any(String) });
+        assertModelEditableField(exercise, field);
       }
     }
   });

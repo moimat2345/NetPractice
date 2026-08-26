@@ -263,11 +263,11 @@ function buildOriginalMission({
 
   const allFields = [
     { id: editableField('alpha', 'interfaces', 'alpha-lan', 'address'), value: formatIPv4(alphaLan), meta: { kind: 'address', role: 'host', deviceId: 'alpha', interfaceId: 'alpha-lan', prefix: lanAPrefix } },
-    { id: editableField('alpha', 'interfaces', 'alpha-lan', 'prefix'), value: `/${lanAPrefix}`, meta: { kind: 'prefix', role: 'mask', deviceId: 'alpha', interfaceId: 'alpha-lan' } },
+    { id: editableField('alpha', 'interfaces', 'alpha-lan', 'prefix'), value: `/${lanAPrefix}`, meta: { kind: 'prefix', role: 'mask', deviceId: 'alpha', interfaceId: 'alpha-lan', prefix: lanAPrefix } },
     { id: editableField('alpha', 'routes', 'alpha-default', 'gateway'), value: formatIPv4(atlasLan), meta: { kind: 'address', role: 'gateway', deviceId: 'alpha', routeId: 'alpha-default', prefix: lanAPrefix } },
     { id: editableField('beta', 'routes', 'beta-default', 'gateway'), value: formatIPv4(borealLan), meta: { kind: 'address', role: 'gateway', deviceId: 'beta', routeId: 'beta-default', prefix: lanBPrefix } },
     { id: editableField('atlas', 'routes', 'atlas-lan-b', 'destination'), value: formatIPv4(lanB.network), meta: { kind: 'address', role: 'route-destination', deviceId: 'atlas', routeId: 'atlas-lan-b', prefix: lanBPrefix } },
-    { id: editableField('atlas', 'routes', 'atlas-lan-b', 'prefix'), value: `/${lanBPrefix}`, meta: { kind: 'prefix', role: 'route-prefix', deviceId: 'atlas', routeId: 'atlas-lan-b' } },
+    { id: editableField('atlas', 'routes', 'atlas-lan-b', 'prefix'), value: `/${lanBPrefix}`, meta: { kind: 'prefix', role: 'route-prefix', deviceId: 'atlas', routeId: 'atlas-lan-b', prefix: lanBPrefix } },
     { id: editableField('atlas', 'routes', 'atlas-lan-b', 'gateway'), value: formatIPv4(borealTransit), meta: { kind: 'address', role: 'gateway', deviceId: 'atlas', routeId: 'atlas-lan-b', prefix: transitSegment.prefix } },
     { id: editableField('boreal', 'routes', 'boreal-lan-a', 'destination'), value: formatIPv4(lanA.network), meta: { kind: 'address', role: 'route-destination', deviceId: 'boreal', routeId: 'boreal-lan-a', prefix: lanAPrefix } },
     { id: editableField('boreal', 'routes', 'boreal-lan-a', 'gateway'), value: formatIPv4(atlasTransit), meta: { kind: 'address', role: 'gateway', deviceId: 'boreal', routeId: 'boreal-lan-a', prefix: transitSegment.prefix } },
