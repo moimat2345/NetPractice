@@ -70,6 +70,7 @@ export const fr = {
     backHome: 'Retour à l’accueil de Subnet Notes',
     startFirst: 'Commencer le premier atelier',
     openStage: 'Ouvrir l’étape',
+    workshopDirectory: 'Ateliers du parcours',
     pathLabel: 'Six étapes, un seul fil',
     pathTitle: 'Ton carnet de progression',
     pathIntro: 'Chaque étape ajoute une pièce au trajet du paquet. Avance dans l’ordre, puis reviens sur les calculs qui résistent.',

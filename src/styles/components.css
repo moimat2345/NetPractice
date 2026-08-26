@@ -324,6 +324,27 @@
   font-size: 0.84rem;
 }
 
+.workshop-index {
+  display: flex;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  list-style: none;
+}
+
+.workshop-index-link {
+  color: var(--muted-ink);
+  font-size: 0.72rem;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 0.2em;
+}
+
+.workshop-index-link:hover {
+  color: var(--accent-dark);
+  text-decoration-color: currentColor;
+}
+
 .ledger-link {
   display: inline-flex;
   min-height: 44px;

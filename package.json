@@ -18,7 +18,6 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
   "description": "",
   "devDependencies": {
     "@playwright/test": "^1.62.1",

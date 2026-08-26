@@ -70,6 +70,7 @@ export const en = {
     backHome: 'Back to the Subnet Notes home page',
     startFirst: 'Start the first workshop',
     openStage: 'Open stage',
+    workshopDirectory: 'Curriculum workshops',
     pathLabel: 'Six stages, one thread',
     pathTitle: 'Your progress notebook',
     pathIntro: 'Each stage adds one part of the packet journey. Work in order, then revisit the calculations that still resist.',

@@ -1,4 +1,6 @@
 import { element } from './dom.js';
+import { lessonsEn } from '../content/lessons.en.js';
+import { lessonsFr } from '../content/lessons.fr.js';
 
 let examAttemptCounter = 0;
 
@@ -11,10 +13,11 @@ function isComplete(progress, workshopId) {
   return Boolean(progress?.completed?.[workshopId]);
 }
 
-function routeLink(label, route, className, onNavigate) {
+function routeLink(label, route, className, onNavigate, attributes = {}) {
   return element('a', {
     className,
     href: `#${route}`,
+    ...attributes,
     onClick: (event) => {
       event.preventDefault();
       onNavigate(route);
@@ -52,6 +55,7 @@ export function renderHome({ i18n, progress, sections = [], onNavigate = () => {
   const hero = element('section', { className: 'home-hero', 'aria-labelledby': 'home-title' }, [heroCopy, methodNote]);
 
   const ledger = element('ol', { className: 'learning-ledger' });
+  const lessons = i18n.locale === 'en' ? lessonsEn : lessonsFr;
   const firstPendingIndex = sections.findIndex((section) => !isComplete(progress, section.workshopId));
   sections.forEach((section, index) => {
     const complete = isComplete(progress, section.workshopId);
@@ -63,6 +67,14 @@ export function renderHome({ i18n, progress, sections = [], onNavigate = () => {
         element('p', { className: 'ledger-status' }, [i18n.t(stateKey)]),
         element('h3', {}, [i18n.t(section.titleKey)]),
         element('p', {}, [i18n.t(section.summaryKey)]),
+        element('ol', { className: 'workshop-index' }, section.workshops.map((workshopId, workshopIndex) =>
+          element('li', {}, [routeLink(
+            `${workshopIndex + 1}. ${lessons[workshopId].title}`,
+            `/workshops/${workshopId}`,
+            'workshop-index-link',
+            onNavigate,
+            { 'data-workshop-link': workshopId },
+          )]))),
       ]),
       element('div', { className: 'ledger-actions' }, [
         routeLink(
@@ -81,13 +93,14 @@ export function renderHome({ i18n, progress, sections = [], onNavigate = () => {
     ]));
   });
 
+  const workshopDirectory = element('nav', { 'aria-label': i18n.t('home.workshopDirectory') }, [ledger]);
   const path = element('section', { className: 'path-section', 'aria-labelledby': 'path-title' }, [
     element('div', { className: 'section-heading' }, [
       element('p', { className: 'eyebrow' }, [i18n.t('home.pathLabel')]),
       element('h2', { id: 'path-title' }, [i18n.t('home.pathTitle')]),
       element('p', {}, [i18n.t('home.pathIntro')]),
     ]),
-    ledger,
+    workshopDirectory,
   ]);
 
   home.append(hero, path);

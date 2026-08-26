@@ -17,6 +17,7 @@ const stageEntryWorkshops = {
 const LEARNING_PATH = curriculum.map((stage) => ({
   id: stage.id,
   workshopId: stageEntryWorkshops[stage.id] ?? stage.workshops[0],
+  workshops: [...stage.workshops],
   titleKey: stage.titleKey,
   summaryKey: `path.${stage.id}.summary`,
 }));
@@ -157,6 +158,7 @@ export function createApp(root, dependencies) {
 
   function onHashChange() {
     renderRoute();
+    globalThis.scrollTo?.(0, 0);
     shell.outlet.focus({ preventScroll: true });
   }
 

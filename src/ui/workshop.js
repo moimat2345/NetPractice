@@ -98,7 +98,7 @@ function restoreFocus(root, snapshot) {
 
 export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }) {
   if (!definition) throw new TypeError('A workshop definition is required');
-  const root = element('article', { className: 'workshop-view' });
+  const root = element('article', { className: 'workshop-view', 'data-workshop': definition.id });
   let variation = 0;
   let exercise = makeExercise(definition, String(seed));
   let recordedSeed = null;
@@ -197,7 +197,7 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
       element('div', {}, [
         element('p', { className: 'eyebrow' }, [i18n.t(`course.${definition.stageId}.eyebrow`)]),
         element('h1', { id: 'workshop-title' }, [lessonContent.title]),
-        element('p', { className: 'workshop-intro' }, [lessonContent.microLesson]),
+        element('p', { className: 'workshop-intro', 'data-micro-lesson': '' }, [lessonContent.microLesson]),
         element('p', { className: 'note-label' }, [i18n.t('course.method')]),
         element('ol', { className: 'workshop-method' }, lessonContent.methodSteps.map((step) =>
           element('li', {}, [step]))),
