@@ -1,10 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import { parseIPv4 } from '../../src/core/ipv4.js';
-import { broadcastOf, isUsableHost, networkOf, parseMask, sameSubnet, usableRange } from '../../src/core/subnet.js';
+import {
+  broadcastOf,
+  isUsableHost,
+  maskToPrefix,
+  networkOf,
+  parseMask,
+  prefixToMask,
+  sameSubnet,
+  usableRange,
+} from '../../src/core/subnet.js';
 
 const ip = (value) => parseIPv4(value);
 
 describe('subnet calculations', () => {
+  it('round-trips every valid prefix through its numeric mask', () => {
+    for (let prefix = 0; prefix <= 32; prefix += 1) {
+      expect(maskToPrefix(prefixToMask(prefix))).toBe(prefix);
+    }
+    expect(prefixToMask(0)).toBe(0);
+    expect(maskToPrefix(0)).toBe(0);
+    expect(prefixToMask(32)).toBe(0xffffffff);
+    expect(maskToPrefix(0xffffffff)).toBe(32);
+  });
+
+  it('rejects invalid prefixes and non-contiguous numeric masks', () => {
+    expect(() => prefixToMask(-1)).toThrow(RangeError);
+    expect(() => prefixToMask(33)).toThrow(RangeError);
+    expect(() => prefixToMask(3.5)).toThrow(RangeError);
+    expect(maskToPrefix(-1)).toBeNull();
+    expect(maskToPrefix(0x100000000)).toBeNull();
+    expect(maskToPrefix(parseIPv4('255.0.255.0'))).toBeNull();
+  });
+
   it('parses CIDR and contiguous dotted masks', () => {
     expect(parseMask('/27')).toEqual({ prefix: 27, mask: 4294967264 });
     expect(parseMask('255.255.255.224')).toEqual({ prefix: 27, mask: 4294967264 });
