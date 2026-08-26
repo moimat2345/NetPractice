@@ -121,23 +121,24 @@ export function createTopology({
   function updateLinks() {
     frame = null;
     if (destroyed || isMobile() || !canvas.isConnected) return;
-    const canvasRect = canvas.getBoundingClientRect();
-    svg.setAttribute('viewBox', `0 0 ${canvasRect.width} ${canvasRect.height}`);
+    const svgRect = svg.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${svgRect.width} ${svgRect.height}`);
     for (const { path, sourceId, targetId } of paths) {
       const sourceRect = nodes.get(sourceId).getBoundingClientRect();
       const targetRect = nodes.get(targetId).getBoundingClientRect();
-      const endpoints = nearestEdgePoints(sourceRect, targetRect, canvasRect);
+      const endpoints = nearestEdgePoints(sourceRect, targetRect, svgRect);
       path.setAttribute('d', `M ${endpoints.start.x} ${endpoints.start.y} L ${endpoints.end.x} ${endpoints.end.y}`);
       path.dataset.endpoints = [
-        endpoints.start.x + canvasRect.left,
-        endpoints.start.y + canvasRect.top,
-        endpoints.end.x + canvasRect.left,
-        endpoints.end.y + canvasRect.top,
+        endpoints.start.x + svgRect.left,
+        endpoints.start.y + svgRect.top,
+        endpoints.end.x + svgRect.left,
+        endpoints.end.y + svgRect.top,
       ].join(',');
     }
   }
 
   function scheduleLinks() {
+    if (destroyed) return;
     if (frame !== null) cancelAnimationFrame(frame);
     frame = requestAnimationFrame(updateLinks);
   }

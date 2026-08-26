@@ -10,13 +10,18 @@ async function linkMetrics(page) {
       const source = nodes.get(path.dataset.source);
       const target = nodes.get(path.dataset.target);
       const values = path.getAttribute('data-endpoints').split(',').map(Number);
+      const matrix = path.getScreenCTM();
+      const renderedStartPoint = path.getPointAtLength(0).matrixTransform(matrix);
+      const renderedEndPoint = path.getPointAtLength(path.getTotalLength()).matrixTransform(matrix);
       const distance = (x, y, rect) => Math.hypot(
         Math.max(rect.left - x, 0, x - rect.right),
         Math.max(rect.top - y, 0, y - rect.bottom),
       );
       return {
-        start: distance(values[0], values[1], source),
-        end: distance(values[2], values[3], target),
+        attributeStart: distance(values[0], values[1], source),
+        attributeEnd: distance(values[2], values[3], target),
+        renderedStart: distance(renderedStartPoint.x, renderedStartPoint.y, source),
+        renderedEnd: distance(renderedEndPoint.x, renderedEndPoint.y, target),
       };
     });
   });
@@ -31,7 +36,11 @@ for (const project of ['ultrawide', 'desktop', 'portrait']) {
       await expect(page.locator('.curriculum-sidebar')).toBeHidden();
     }
     await expect.poll(() => linkMetrics(page)).toHaveLength(5);
-    expect((await linkMetrics(page)).every((link) => link.start <= 1 && link.end <= 1)).toBe(true);
+    expect((await linkMetrics(page)).every((link) =>
+      link.attributeStart <= 1
+      && link.attributeEnd <= 1
+      && link.renderedStart <= 1
+      && link.renderedEnd <= 1)).toBe(true);
   });
 }
 
@@ -41,9 +50,11 @@ test('recomputes attached endpoints after resizing the same page', async ({ page
   await expect.poll(() => linkMetrics(page)).toHaveLength(5);
 
   await page.setViewportSize({ width: 1024, height: 1000 });
-  await expect.poll(async () => (await linkMetrics(page)).every((link) => link.start <= 1 && link.end <= 1)).toBe(true);
+  await expect.poll(async () => (await linkMetrics(page)).every((link) =>
+    link.renderedStart <= 1 && link.renderedEnd <= 1)).toBe(true);
   await page.setViewportSize({ width: 2200, height: 1000 });
-  await expect.poll(async () => (await linkMetrics(page)).every((link) => link.start <= 1 && link.end <= 1)).toBe(true);
+  await expect.poll(async () => (await linkMetrics(page)).every((link) =>
+    link.renderedStart <= 1 && link.renderedEnd <= 1)).toBe(true);
 });
 
 test('selects devices with the keyboard and edits only the selected configuration', async ({ page }, testInfo) => {
@@ -78,6 +89,40 @@ test('shows switch connectivity without inventing IP controls', async ({ page },
   const switchPanel = page.locator('[data-device-config="orme"]');
   await expect(switchPanel).toContainText(/segment|lan/i);
   await expect(switchPanel.locator('input')).toHaveCount(0);
+});
+
+test('does not enqueue link work after the topology is destroyed', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop');
+  await page.addInitScript(() => {
+    let resolveFonts;
+    const ready = new Promise((resolve) => {
+      resolveFonts = resolve;
+    });
+    Object.defineProperty(document, 'fonts', { configurable: true, value: { ready } });
+    const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+    let frameRequests = 0;
+    window.requestAnimationFrame = (callback) => {
+      frameRequests += 1;
+      return nativeRequestAnimationFrame(callback);
+    };
+    window.__topologyLifecycle = {
+      get frameRequests() { return frameRequests; },
+      resolveFonts,
+    };
+  });
+  await page.goto(missionUrl);
+  await expect.poll(() => linkMetrics(page)).toHaveLength(5);
+
+  await page.evaluate(() => {
+    location.hash = '#/';
+  });
+  await expect(page.locator('[data-topology]')).toHaveCount(0);
+  await page.waitForTimeout(50);
+  const before = await page.evaluate(() => window.__topologyLifecycle.frameRequests);
+  await page.evaluate(() => window.__topologyLifecycle.resolveFonts());
+  await page.waitForTimeout(50);
+
+  expect(await page.evaluate(() => window.__topologyLifecycle.frameRequests)).toBe(before);
 });
 
 test('uses a packet-ordered stacked list without horizontal overflow on mobile', async ({ page }, testInfo) => {
