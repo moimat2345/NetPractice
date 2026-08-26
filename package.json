@@ -1,0 +1,29 @@
+{
+  "name": "subnet-notes",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check:public": "node scripts/public-safety.mjs",
+    "verify": "npm run check:public && npm test && npm run build && npm run test:e2e"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7"
+  },
+  "type": "module"
+}

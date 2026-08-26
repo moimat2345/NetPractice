@@ -1,2 +1,18 @@
 # Isolated implementation worktrees
 .worktrees/
+
+# Official local training material - never publish
+net_practice/
+en.subject _netpractice.pdf
+
+# Local analysis and design companions
+.superpowers/
+tmp/
+.DS_Store
+
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
