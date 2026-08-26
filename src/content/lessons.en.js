@@ -8,14 +8,14 @@ export const lessonsEn = {
   },
   'ipv4-octets-2': {
     title: 'Master octet boundaries',
-    microLesson: 'An octet contains eight bits, which gives 256 possible values: 0 through 255. The value 256 already belongs in the next octet. Quickly spotting 0, 255, and powers of two prevents common mistakes when reading addresses and masks.',
-    objective: 'Complete an address containing a value near an octet boundary.',
+    microLesson: 'An octet contains eight bits, giving 256 possible values from 0 through 255. The value 256 already belongs in the next octet. Private IPv4 ranges are 10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16; the generated example belongs to the first one.',
+    objective: 'Complete a private address containing a value near an octet boundary.',
     methodSteps: ['Isolate the requested octet.', 'Check the 0–255 boundary.', 'Reassemble all four octets.'],
     readinessLabel: 'Ready to work with octets',
   },
   'mask-conversion-1': {
-    title: 'Convert CIDR to dotted masks',
-    microLesson: 'The number after the slash says how many mask bits are set from the left. Each full octet accounts for eight bits, so /24 is 255.255.255.0. For a partial octet, add 128, 64, 32, 16, 8, 4, 2, and 1 in order.',
+    title: 'Convert a dotted mask to CIDR',
+    microLesson: 'A contiguous dotted mask has set bits from the left followed only by zeroes. Every 255 octet contributes eight bits to the prefix. In the partial octet, recognize the sum of 128, 64, 32, 16, 8, 4, 2, and 1, then count all set bits.',
     objective: 'Recover the CIDR prefix represented by the given mask.',
     methodSteps: ['Count the 255 octets.', 'Decode the partial octet.', 'Add the set bits to obtain the prefix.'],
     readinessLabel: 'Ready to convert subnet masks',

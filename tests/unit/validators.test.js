@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { formatIPv4 } from '../../src/core/ipv4.js';
-import { generateFocusedExercise, generateMission } from '../../src/exercises/generators.js';
+import {
+  generateFocusedExercise,
+  generateMission,
+  getWorkshopGenerator,
+} from '../../src/exercises/generators.js';
 import {
   classifyHostAddress,
   validateGateway,
@@ -81,6 +85,42 @@ describe('validateSubmission', () => {
         ]),
       });
     }
+  });
+
+  it('accepts any strict IPv4 value in the isolated validity drill', () => {
+    const exercise = getWorkshopGenerator('ipv4-validity-1')({ seed: 'format-only' });
+    const field = exercise.editableFields[0];
+
+    expect(validateSubmission(exercise, { [field]: '8.8.8.8' }))
+      .toMatchObject({ ok: true, diagnostics: [], traces: [] });
+    expect(validateSubmission(exercise, { [field]: '8.8.8.999' }))
+      .toMatchObject({ ok: false, diagnostics: [{ code: 'invalid-ip', field }] });
+  });
+
+  it('requires CIDR output when converting a dotted mask', () => {
+    const exercise = getWorkshopGenerator('mask-conversion-1')({ seed: 'cidr-output' });
+    const field = exercise.editableFields[0];
+    const dottedClue = exercise.fieldMeta[field].dottedMask;
+
+    expect(validateSubmission(exercise, { [field]: dottedClue }))
+      .toMatchObject({ ok: false, diagnostics: [{ code: 'invalid-mask', field }] });
+    expect(validateSubmission(exercise, { [field]: exercise.solution[field] }))
+      .toMatchObject({ ok: true, diagnostics: [], traces: [{ ok: true }] });
+  });
+
+  it('rejects a reachable next hop that is not the required default-route exit', () => {
+    const exercise = getWorkshopGenerator('default-route-2')({ seed: 'default-exit' });
+    const field = exercise.editableFields.find((candidate) => candidate.endsWith('.gateway'));
+    const wrongReachableGateway = formatIPv4(exercise.facts.gateways.borealTransit);
+
+    expect(wrongReachableGateway).not.toBe(exercise.solution[field]);
+    expect(validateSubmission(exercise, {
+      ...exercise.solution,
+      [field]: wrongReachableGateway,
+    })).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'wrong-default-gateway', field }],
+    });
   });
 });
 

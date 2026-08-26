@@ -55,6 +55,14 @@ function parseEditableFields(exercise, submission) {
     const value = submission?.[field];
     const meta = exercise.fieldMeta?.[field];
     if (meta?.kind === 'prefix') {
+      if (meta.syntax === 'cidr' && !/^\/(0|[1-9]|[12]\d|3[0-2])$/.test(value ?? '')) {
+        diagnostics.push(diagnostic('invalid-mask', {
+          deviceId: meta.deviceId ?? null,
+          field,
+          params: { value: value ?? null },
+        }));
+        continue;
+      }
       const parsed = parseMask(value);
       if (parsed === null) {
         diagnostics.push(diagnostic('invalid-mask', {
@@ -109,6 +117,25 @@ function validateCalculatedAnswers(exercise, values) {
     const expected = parseIPv4(exercise.solution[field]);
     if (expected !== null && value !== expected) {
       diagnostics.push(diagnostic('incorrect-calculation', {
+        field,
+        params: { role: meta.role },
+      }));
+    }
+  }
+  return diagnostics;
+}
+
+function validateExactAnswers(exercise, values) {
+  const diagnostics = [];
+  for (const [field, value] of values) {
+    const meta = exercise.fieldMeta?.[field];
+    if (!meta?.requiresExact) continue;
+    const expected = meta.kind === 'prefix'
+      ? parseMask(exercise.solution[field])?.prefix
+      : parseIPv4(exercise.solution[field]);
+    if (expected !== value) {
+      diagnostics.push(diagnostic(meta.exactDiagnostic ?? 'incorrect-calculation', {
+        deviceId: meta.deviceId ?? null,
         field,
         params: { role: meta.role },
       }));
@@ -291,8 +318,13 @@ export function validateSubmission(exercise, submission) {
   if (parsed.diagnostics.length > 0) return { ok: false, diagnostics: parsed.diagnostics, traces: [] };
 
   const calculatedDiagnostics = validateCalculatedAnswers(exercise, parsed.values);
-  if (calculatedDiagnostics.length > 0) {
-    return { ok: false, diagnostics: calculatedDiagnostics, traces: [] };
+  const exactDiagnostics = validateExactAnswers(exercise, parsed.values);
+  if (calculatedDiagnostics.length > 0 || exactDiagnostics.length > 0) {
+    return { ok: false, diagnostics: [...calculatedDiagnostics, ...exactDiagnostics], traces: [] };
+  }
+
+  if (exercise.validationMode === 'format-only') {
+    return { ok: true, diagnostics: [], traces: [] };
   }
 
   const configured = applySubmission(exercise, parsed.values);

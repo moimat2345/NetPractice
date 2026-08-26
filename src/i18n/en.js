@@ -196,10 +196,31 @@ export const en = {
     'unreachable-next-hop': 'Next hop {gateway} is not reachable from {localAddress}/{prefix}.',
     'missing-default-route': 'This host has no default route to reach {destinationId}.',
     'wrong-route-destination': 'Route {destination}/{prefix} does not cover the expected remote network.',
+    'wrong-default-gateway': 'This gateway is reachable, but it is not the required exit for the default route.',
     'unreachable-destination': 'The packet cannot reach its destination ({reason}).',
     'missing-return-path': 'The outbound packet works, but the return path is missing ({reason}).',
   },
   hint: {
+    ipv4: {
+      observe: 'Focus only on the requested address shape before thinking about its network.',
+      method: 'Count four decimal octets separated by three dots, then check that every value is between 0 and 255.',
+      nearSolution: 'Read the address one octet at a time: no sign, spaces, value above 255, or unnecessary leading zero.',
+    },
+    mask: {
+      observe: 'Inspect dotted mask {dottedMask}; separate the full octets from the partial one.',
+      method: 'For {dottedMask}, count eight bits for each 255 octet, then the set bits in the partial octet.',
+      nearSolution: 'The result must be a CIDR prefix beginning with “/”; count the set bits instead of copying the dotted mask.',
+    },
+    range: {
+      observe: 'Find prefix /{prefix} and the requested field role before calculating.',
+      method: 'With mask /{prefix}, move in blocks of {blockSize} addresses to locate the block containing the given address.',
+      nearSolution: 'Find both block boundaries first, then adjust only when the field asks for a usable host.',
+    },
+    route: {
+      observe: 'Follow the goal from {source} to {destination} and locate the editable route on {deviceId}.',
+      method: 'At each hop from {source} to {destination}, check destination, prefix, then a directly reachable next hop.',
+      nearSolution: 'On {deviceId}, choose the route matching the target network before the default route, then remember the reverse journey.',
+    },
     gateway: {
       observe: 'Inspect the gateway configured on {deviceId}. It must be in the same subnet as the host.',
       method: 'For {localAddress}/{prefix}, calculate the subnet boundaries before choosing the gateway.',

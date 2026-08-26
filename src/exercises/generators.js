@@ -379,7 +379,9 @@ function generateBasicWorkshop(definition, seed) {
 
   switch (definition.id) {
     case 'ipv4-validity-1':
-      return configureWorkshop(base, definition, [hostAddress('valid-ipv4')]);
+      base.validationMode = 'format-only';
+      base.facts.clue = '4 octets · 0–255';
+      return configureWorkshop(base, definition, [hostAddress('valid-ipv4', { validation: 'format-only' })]);
     case 'ipv4-octets-2': {
       const random = createRandom(`${seed}-octet`);
       const prefix = 24;
@@ -395,12 +397,18 @@ function generateBasicWorkshop(definition, seed) {
         broadcast: broadcastOf(hostInterface.address, prefix),
         usable: usableRange(hostInterface.address, prefix),
         octetBounds: { minimum: 0, maximum: 255 },
+        privateRange: '10.0.0.0/8',
       };
-      return configureWorkshop(base, definition, [hostAddress('octet-boundary', { octetIndex: 2 })]);
+      return configureWorkshop(base, definition, [hostAddress('octet-boundary', {
+        octetIndex: 2,
+        addressScope: 'private',
+        privateRange: '10.0.0.0/8',
+      })]);
     }
     case 'mask-conversion-1': {
       const maskField = modelField(base, 'host-a', 'interfaces', 'host-a-lan', 'prefix', 'mask', {
-          dottedMask: formatIPv4(((0xffffffff << (32 - hostInterface.prefix)) >>> 0)),
+        dottedMask: formatIPv4(((0xffffffff << (32 - hostInterface.prefix)) >>> 0)),
+        syntax: 'cidr',
       });
       base.facts.clue = maskField.meta.dottedMask;
       return configureWorkshop(base, definition, [maskField]);
@@ -500,7 +508,11 @@ function missionRouteFields(exercise, definition) {
     return [
       field('atlas', 'atlas-default', 'destination', 'route-destination', { isDefault: true }),
       field('atlas', 'atlas-default', 'prefix', 'route-prefix', { isDefault: true }),
-      field('atlas', 'atlas-default', 'gateway', 'gateway', { isDefault: true }),
+      field('atlas', 'atlas-default', 'gateway', 'gateway', {
+        isDefault: true,
+        requiresExact: true,
+        exactDiagnostic: 'wrong-default-gateway',
+      }),
     ];
   }
   if (definition.id === 'return-path-4') {

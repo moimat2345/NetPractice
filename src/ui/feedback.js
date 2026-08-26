@@ -1,7 +1,32 @@
 import { formatIPv4 } from '../core/ipv4.js';
+import { broadcastOf, networkOf, usableRange } from '../core/subnet.js';
 import { element } from './dom.js';
 
+function editedRouteContext(exercise) {
+  const routeFields = exercise.editableFields
+    .map((field) => exercise.fieldMeta?.[field])
+    .filter((meta) => meta?.deviceId && meta?.routeId);
+  const meta = routeFields.find((candidate) =>
+    ['route-destination', 'route-prefix'].includes(candidate.role)) ?? routeFields[0];
+  if (!meta) return null;
+  const device = exercise.devices.find((candidate) => candidate.id === meta.deviceId);
+  const route = device?.routes.find((candidate) => candidate.id === meta.routeId);
+  if (!route || !Number.isInteger(route.destination) || !Number.isInteger(route.prefix)) return null;
+  const network = networkOf(route.destination, route.prefix);
+  return {
+    route,
+    segment: {
+      network,
+      prefix: route.prefix,
+      broadcast: broadcastOf(network, route.prefix),
+      usable: usableRange(network, route.prefix),
+    },
+  };
+}
+
 function firstSegment(exercise) {
+  const routeContext = editedRouteContext(exercise);
+  if (routeContext) return routeContext.segment;
   if (Number.isInteger(exercise.facts?.network)) {
     return {
       network: exercise.facts.network,
@@ -14,6 +39,8 @@ function firstSegment(exercise) {
 }
 
 function firstGateway(exercise) {
+  const routeContext = editedRouteContext(exercise);
+  if (Number.isInteger(routeContext?.route.gateway)) return routeContext.route.gateway;
   const gateway = Object.values(exercise.facts?.gateways ?? {})[0];
   if (Number.isInteger(gateway)) return gateway;
   return exercise.devices.flatMap((device) => device.routes).find((route) => Number.isInteger(route.gateway))?.gateway ?? null;
@@ -23,7 +50,7 @@ export function correctionSteps(exercise) {
   const segment = firstSegment(exercise);
   const gateway = firstGateway(exercise);
   const firstGoal = exercise.goals[0] ?? { sourceId: '?', destinationId: '?' };
-  const reverseGoal = exercise.goals[1] ?? { sourceId: firstGoal.destinationId, destinationId: firstGoal.sourceId };
+  const reverseGoal = { sourceId: firstGoal.destinationId, destinationId: firstGoal.sourceId };
   const values = {
     network: Number.isInteger(segment?.network) ? formatIPv4(segment.network) : '—',
     prefix: segment?.prefix ?? '—',

@@ -189,4 +189,42 @@ describe('curriculum contract', () => {
     expect(mask.facts.clue).toBe(maskMeta.dottedMask);
     expect(range.facts.blockSize).toBe(2 ** (32 - range.facts.prefix));
   });
+
+  it('states mask-conversion direction consistently and practices a private IPv4 example', () => {
+    const privateExample = getWorkshopGenerator('ipv4-octets-2')({ seed: 'private-range' });
+    const privateMeta = Object.values(privateExample.fieldMeta)[0];
+
+    expect(lessonsFr['mask-conversion-1'].title).toBe('Passe du masque décimal au CIDR');
+    expect(lessonsEn['mask-conversion-1'].title).toBe('Convert a dotted mask to CIDR');
+    expect(lessonsFr['ipv4-octets-2'].microLesson).toContain('10.0.0.0/8');
+    expect(lessonsFr['ipv4-octets-2'].microLesson).toContain('172.16.0.0/12');
+    expect(lessonsFr['ipv4-octets-2'].microLesson).toContain('192.168.0.0/16');
+    expect(lessonsEn['ipv4-octets-2'].microLesson).toContain('10.0.0.0/8');
+    expect(lessonsEn['ipv4-octets-2'].microLesson).toContain('172.16.0.0/12');
+    expect(lessonsEn['ipv4-octets-2'].microLesson).toContain('192.168.0.0/16');
+    expect(privateMeta).toMatchObject({ addressScope: 'private', privateRange: '10.0.0.0/8' });
+    expect(Object.values(privateExample.solution)[0]).toMatch(/^10\./);
+  });
+
+  it('grounds route correction in the edited route and reverses the first goal explicitly', () => {
+    const routeParts = getWorkshopGenerator('route-parts-1')({ seed: 'route-context-audit' });
+    const routeSteps = correctionSteps(routeParts);
+    const identify = routeSteps.find((step) => step.key === 'correction.identify');
+    const gateway = routeSteps.find((step) => step.key === 'correction.gateway');
+    const guided = getWorkshopGenerator('guided-mission-2')({ seed: 'return-context-audit' });
+    const guidedSteps = correctionSteps(guided);
+    const forward = guidedSteps.find((step) => step.key === 'correction.forward');
+    const back = guidedSteps.find((step) => step.key === 'correction.return');
+
+    expect(identify.params).toMatchObject({
+      network: '10.189.167.0',
+      prefix: 28,
+      broadcast: '10.189.167.15',
+      first: '10.189.167.1',
+      last: '10.189.167.14',
+    });
+    expect(gateway.params.gateway).toBe('172.189.253.2');
+    expect(forward.params).toMatchObject({ source: 'cove', destination: 'delta' });
+    expect(back.params).toMatchObject({ returnSource: 'delta', returnDestination: 'cove' });
+  });
 });

@@ -196,10 +196,31 @@ export const fr = {
     'unreachable-next-hop': 'Le prochain saut {gateway} n’est pas joignable depuis {localAddress}/{prefix}.',
     'missing-default-route': 'Aucune route par défaut ne permet à cet hôte de joindre {destinationId}.',
     'wrong-route-destination': 'La route {destination}/{prefix} ne couvre pas le réseau distant attendu.',
+    'wrong-default-gateway': 'Cette passerelle est joignable, mais ce n’est pas la sortie demandée pour la route par défaut.',
     'unreachable-destination': 'Le paquet ne peut pas atteindre sa destination ({reason}).',
     'missing-return-path': 'Le paquet aller passe, mais le chemin de retour manque ({reason}).',
   },
   hint: {
+    ipv4: {
+      observe: 'Observe uniquement la forme de l’adresse demandée avant de penser au réseau.',
+      method: 'Compte quatre octets décimaux séparés par trois points, puis contrôle chaque valeur entre 0 et 255.',
+      nearSolution: 'Relis l’adresse octet par octet : aucun signe, espace, valeur supérieure à 255 ou zéro initial inutile.',
+    },
+    mask: {
+      observe: 'Observe le masque décimal {dottedMask} et repère les octets complets puis l’octet partiel.',
+      method: 'Pour {dottedMask}, compte huit bits par octet à 255, puis les bits à 1 de l’octet partiel.',
+      nearSolution: 'Le résultat doit être un préfixe CIDR commençant par « / » ; recompte les bits à 1 sans recopier le masque décimal.',
+    },
+    range: {
+      observe: 'Repère le préfixe /{prefix} et le rôle du champ demandé avant de calculer.',
+      method: 'Avec le masque /{prefix}, avance par blocs de {blockSize} adresses pour localiser celui qui contient l’adresse donnée.',
+      nearSolution: 'Trouve d’abord les deux bornes du bloc, puis ajuste seulement si le champ demande un hôte utilisable.',
+    },
+    route: {
+      observe: 'Suis l’objectif de {source} vers {destination} et repère la route modifiable sur {deviceId}.',
+      method: 'À chaque saut entre {source} et {destination}, vérifie destination, préfixe, puis prochain saut directement joignable.',
+      nearSolution: 'Sur {deviceId}, choisis la route correspondant au réseau cible avant la route par défaut, sans oublier le trajet inverse.',
+    },
     gateway: {
       observe: 'Observe la passerelle configurée sur {deviceId}. Elle doit appartenir au même sous-réseau que l’hôte.',
       method: 'Avec {localAddress}/{prefix}, calcule d’abord les bornes du sous-réseau avant de choisir la passerelle.',

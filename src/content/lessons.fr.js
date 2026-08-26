@@ -8,14 +8,14 @@ export const lessonsFr = {
   },
   'ipv4-octets-2': {
     title: 'Maîtrise les limites d’un octet',
-    microLesson: 'Un octet porte huit bits, donc 256 valeurs possibles : de 0 à 255. La valeur 256 appartient déjà à l’octet suivant. Repérer rapidement 0, 255 et les puissances de deux évite les erreurs de lecture dans les adresses et les masques.',
-    objective: 'Complète une adresse contenant une valeur proche d’une limite d’octet.',
+    microLesson: 'Un octet porte huit bits, donc 256 valeurs possibles : de 0 à 255. La valeur 256 appartient déjà à l’octet suivant. Les plages IPv4 privées sont 10.0.0.0/8, 172.16.0.0/12 et 192.168.0.0/16 : l’exemple généré appartient à la première.',
+    objective: 'Complète une adresse privée contenant une valeur proche d’une limite d’octet.',
     methodSteps: ['Isole l’octet demandé.', 'Vérifie la borne 0–255.', 'Recompose les quatre octets.'],
     readinessLabel: 'Prêt à manipuler les octets',
   },
   'mask-conversion-1': {
-    title: 'Passe du CIDR au masque décimal',
-    microLesson: 'Le nombre après la barre indique combien de bits à 1 contient le masque, en partant de la gauche. Chaque octet complet ajoute huit bits : /24 donne 255.255.255.0. Pour l’octet partiel, additionne 128, 64, 32, 16, 8, 4, 2 et 1 dans l’ordre.',
+    title: 'Passe du masque décimal au CIDR',
+    microLesson: 'Un masque décimal continu contient des bits à 1 depuis la gauche, puis seulement des zéros. Chaque octet à 255 apporte huit bits au préfixe. Dans l’octet partiel, reconnais la somme de 128, 64, 32, 16, 8, 4, 2 et 1, puis compte tous les bits à 1.',
     objective: 'Retrouve le préfixe CIDR correspondant au masque donné.',
     methodSteps: ['Compte les octets à 255.', 'Décode l’octet partiel.', 'Additionne les bits pour obtenir le préfixe.'],
     readinessLabel: 'Prêt à convertir les masques',
