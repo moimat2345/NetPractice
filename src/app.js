@@ -25,10 +25,7 @@ export function createApp(root, dependencies) {
 
   function navigate(route) {
     const nextHash = `#${route}`;
-    if (globalThis.location.hash === nextHash) {
-      renderRoute();
-      return;
-    }
+    if (globalThis.location.hash === nextHash) return;
     globalThis.location.hash = nextHash;
   }
 

@@ -1,10 +1,7 @@
 import { element, replace } from './dom.js';
 
 function completedCount(progress, sections) {
-  const completions = progress?.completed && typeof progress.completed === 'object'
-    ? Object.keys(progress.completed)
-    : [];
-  return Math.min(completions.length, sections.length);
+  return sections.filter((section) => isSectionComplete(progress, section)).length;
 }
 
 function isSectionComplete(progress, section) {
@@ -54,6 +51,12 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
   const navigation = element('nav', { className: 'curriculum-nav' });
   const sidebar = element('aside', { className: 'curriculum-sidebar' }, [navigation]);
   const outlet = element('main', { className: 'route-outlet', id: 'main-content', tabindex: '-1' });
+  const focusOutlet = (event) => {
+    event.preventDefault();
+    outlet.focus({ preventScroll: true });
+    outlet.scrollIntoView({ block: 'start' });
+  };
+  skipLink?.addEventListener('click', focusOutlet);
   const footerNote = element('p');
   const footerDescription = element('p');
   const footer = element('footer', { className: 'site-footer' }, [
@@ -133,6 +136,7 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
     setView,
     destroy() {
       unsubscribe();
+      skipLink?.removeEventListener('click', focusOutlet);
       frame.remove();
     },
   };

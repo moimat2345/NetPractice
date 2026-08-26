@@ -4,8 +4,10 @@ export function element(tag, attributes = {}, children = []) {
   for (const [name, value] of Object.entries(attributes)) {
     if (name === 'className') {
       node.className = value;
-    } else if (name.startsWith('on') && typeof value === 'function') {
-      node.addEventListener(name.slice(2).toLowerCase(), value);
+    } else if (name.toLowerCase().startsWith('on')) {
+      if (typeof value === 'function') {
+        node.addEventListener(name.slice(2).toLowerCase(), value);
+      }
     } else if (value === true) {
       node.setAttribute(name, '');
     } else if (value !== false && value !== null && value !== undefined) {

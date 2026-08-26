@@ -204,13 +204,13 @@
 }
 
 .button-primary {
-  background: var(--accent);
+  background: var(--accent-dark);
   color: var(--sheet);
   box-shadow: 4px 4px 0 var(--accent-soft);
 }
 
 .button-primary:hover {
-  background: var(--accent-dark);
+  background: #7f321f;
 }
 
 .method-note {
