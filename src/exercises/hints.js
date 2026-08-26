@@ -70,6 +70,11 @@ function compactParams(params) {
   return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null));
 }
 
+function deviceParam(exercise, deviceId) {
+  const device = exercise.devices?.find((candidate) => candidate.id === deviceId);
+  return typeof device?.labelKey === 'string' ? { messageKey: device.labelKey } : deviceId;
+}
+
 function localAddressForMeta(exercise, meta) {
   const device = exercise.devices?.find((candidate) => candidate.id === meta?.deviceId);
   if (!device) return undefined;
@@ -85,8 +90,9 @@ function exerciseParams(exercise, diagnostic) {
   const meta = fieldMeta(exercise, diagnostic);
   const routeMeta = routeFieldMeta(exercise);
   const firstGoal = exercise.goals?.[0];
+  const referencedDeviceId = diagnostic?.deviceId ?? meta?.deviceId ?? meta?.relatedDeviceId ?? routeMeta?.deviceId;
   return compactParams({
-    deviceId: diagnostic?.deviceId ?? meta?.deviceId ?? meta?.relatedDeviceId ?? routeMeta?.deviceId,
+    deviceId: deviceParam(exercise, referencedDeviceId),
     role: meta?.role,
     prefix: diagnostic?.params?.prefix ?? meta?.prefix ?? exercise.facts?.prefix,
     blockSize: exercise.facts?.blockSize,
@@ -95,8 +101,8 @@ function exerciseParams(exercise, diagnostic) {
     clue: exercise.facts?.clue,
     localAddress: diagnostic?.params?.localAddress
       ?? (meta?.role === 'gateway' ? localAddressForMeta(exercise, meta) : undefined),
-    source: firstGoal?.sourceId,
-    destination: firstGoal?.destinationId,
+    source: deviceParam(exercise, firstGoal?.sourceId),
+    destination: deviceParam(exercise, firstGoal?.destinationId),
     expectedShape: describeExpectedShape(exercise, diagnostic?.field ?? exercise.editableFields?.[0]),
   });
 }
@@ -170,7 +176,7 @@ export function getHint(exercise, validation, level) {
   let params;
   if (legacyKeys) {
     params = level === 1
-      ? { deviceId: diagnostic.deviceId }
+      ? { deviceId: deviceParam(exercise, diagnostic.deviceId) }
       : level === 2
         ? diagnostic.params
         : { ...deriveNearSolutionParams(diagnostic), expectedShape: describeExpectedShape(exercise, diagnostic.field) };

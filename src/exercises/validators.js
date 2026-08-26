@@ -10,6 +10,12 @@ function semanticParam(group, value) {
   return { messageKey: `semantic.${group}.${value}` };
 }
 
+function deviceParam(device) {
+  return typeof device?.labelKey === 'string'
+    ? { messageKey: device.labelKey }
+    : device?.id ?? null;
+}
+
 function hostAddressCode(address, prefix) {
   if (!Number.isInteger(address) || address < 0 || address > 0xffffffff) return 'invalid-ip';
   if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) return 'invalid-mask';
@@ -238,7 +244,7 @@ function validateLinkedSubnets(domains) {
           deviceId: focus.device.id,
           field: editableFieldFor(focus.device, 'interfaces', focus.entry, 'address'),
           params: {
-            peerDeviceId: focus === left ? right.device.id : left.device.id,
+            peerDeviceId: deviceParam(focus === left ? right.device : left.device),
             prefix: focus.entry.prefix,
           },
       }));
@@ -268,7 +274,7 @@ function validateAddressUniqueness(topology) {
         field: editableFieldFor(focus.device, 'interfaces', focus.entry, 'address'),
         params: {
           address: formatIPv4(entry.address),
-          peerDeviceId: peer.device.id,
+          peerDeviceId: deviceParam(peer.device),
           peerInterfaceId: peer.entry.id,
         },
       }));
@@ -355,7 +361,7 @@ function validateDefaultRoutes(topology, domains) {
       diagnostics.push(diagnostic('missing-default-route', {
         deviceId: source.id,
         field: null,
-        params: { destinationId: destination.id },
+        params: { destinationId: deviceParam(destination) },
       }));
     }
   }

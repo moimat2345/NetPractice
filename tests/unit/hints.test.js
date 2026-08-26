@@ -132,11 +132,18 @@ describe('getHint', () => {
     });
     expect(getHint(route, null, 2)).toMatchObject({
       key: 'hint.route.method',
-      params: { source: 'alpha', destination: 'beta', deviceId: 'atlas' },
+      params: {
+        source: { messageKey: 'device.alpha' },
+        destination: { messageKey: 'device.beta' },
+        deviceId: { messageKey: 'device.atlas' },
+      },
     });
     expect(getHint(mask, null, 1).params).toMatchObject({ dottedMask: mask.facts.clue });
     expect(getHint(range, null, 1).params).toMatchObject({ prefix: range.facts.prefix });
-    expect(getHint(route, null, 1).params).toMatchObject({ source: 'alpha', destination: 'beta' });
+    expect(getHint(route, null, 1).params).toMatchObject({
+      source: { messageKey: 'device.alpha' },
+      destination: { messageKey: 'device.beta' },
+    });
     expect(getHint(mask, null, 2).params).not.toHaveProperty('prefix');
     expect(getHint(route, null, 2).params).not.toHaveProperty('prefix');
     expect([1, 2, 3].map((level) => getHint(defaultRoute, null, level).key)).toEqual([

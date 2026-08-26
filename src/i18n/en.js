@@ -183,9 +183,9 @@ export const en = {
       'route-prefix': 'route prefix',
     },
     shape: {
-      address: 'IPv4 address',
-      prefix: 'CIDR prefix',
-      network: 'network value',
+      address: 'an IPv4 address',
+      prefix: 'a CIDR prefix',
+      network: 'a network value',
     },
     traceReason: {
       'missing-route': 'missing route',
@@ -262,22 +262,22 @@ export const en = {
     gateway: {
       observe: 'Inspect the gateway configured on {deviceId}. It must be in the same subnet as the host.',
       method: 'For {localAddress}/{prefix}, calculate the subnet boundaries before choosing the gateway.',
-      nearSolution: 'The subnet runs from {network} to {broadcast}. Find a usable {expectedShape} in that range.',
+      nearSolution: 'The subnet runs from {network} to {broadcast}. Find {expectedShape} that is usable in that range.',
     },
     subnet: {
       observe: 'Compare both ends of the link around {deviceId}.',
       method: 'With a /{prefix} prefix, mask the host bits of both addresses and compare the network addresses.',
-      nearSolution: 'Check that both ends share one network address; the expected field is an {expectedShape}.',
+      nearSolution: 'Check that both ends share one network address; the expected field is {expectedShape}.',
     },
     return: {
       observe: 'The issue is on {deviceId} after the outgoing journey.',
       method: 'Trace the packet back now: every router must know how to reach the source network.',
-      nearSolution: 'Find the route to the source network, then check its next hop and prefix. The expected field is an {expectedShape}.',
+      nearSolution: 'Find the route to the source network, then check its next hop and prefix. The expected field is {expectedShape}.',
     },
     generic: {
       observe: 'Start with the first flagged field: one mistake can block the whole journey.',
       method: 'Apply the mask, find the local network, then follow the gateway, route, and return path.',
-      nearSolution: 'Check the field format and role: it expects an {expectedShape}.',
+      nearSolution: 'Check the field format and role: it expects {expectedShape}.',
     },
   },
   correction: {

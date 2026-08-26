@@ -183,9 +183,9 @@ export const fr = {
       'route-prefix': 'préfixe de route',
     },
     shape: {
-      address: 'adresse IPv4',
-      prefix: 'préfixe CIDR',
-      network: 'valeur de réseau',
+      address: 'une adresse IPv4',
+      prefix: 'un préfixe CIDR',
+      network: 'une valeur de réseau',
     },
     traceReason: {
       'missing-route': 'route manquante',
@@ -262,22 +262,22 @@ export const fr = {
     gateway: {
       observe: 'Observe la passerelle configurée sur {deviceId}. Elle doit appartenir au même sous-réseau que l’hôte.',
       method: 'Avec {localAddress}/{prefix}, calcule d’abord les bornes du sous-réseau avant de choisir la passerelle.',
-      nearSolution: 'Le sous-réseau va de {network} à {broadcast}. Cherche une {expectedShape} utilisable dans cette plage.',
+      nearSolution: 'Le sous-réseau va de {network} à {broadcast}. Cherche {expectedShape} utilisable dans cette plage.',
     },
     subnet: {
       observe: 'Compare les deux extrémités du lien autour de {deviceId}.',
       method: 'Avec un préfixe /{prefix}, masque les bits hôte des deux adresses et compare les adresses réseau.',
-      nearSolution: 'Vérifie que les deux extrémités partagent la même adresse réseau ; le champ attendu est une {expectedShape}.',
+      nearSolution: 'Vérifie que les deux extrémités partagent la même adresse réseau ; le champ attendu est {expectedShape}.',
     },
     return: {
       observe: 'Le problème se situe du côté de {deviceId}, après le trajet aller.',
       method: 'Trace maintenant le paquet dans le sens retour : chaque routeur doit savoir joindre le réseau source.',
-      nearSolution: 'Repère la route vers le réseau source, puis vérifie son prochain saut et son préfixe. Le champ attendu est une {expectedShape}.',
+      nearSolution: 'Repère la route vers le réseau source, puis vérifie son prochain saut et son préfixe. Le champ attendu est {expectedShape}.',
     },
     generic: {
       observe: 'Commence par le premier champ signalé : une seule erreur peut bloquer tout le trajet.',
       method: 'Applique le masque, trouve le réseau local, puis suis passerelle, route et chemin retour.',
-      nearSolution: 'Contrôle le format et le rôle du champ : il attend une {expectedShape}.',
+      nearSolution: 'Contrôle le format et le rôle du champ : il attend {expectedShape}.',
     },
   },
   correction: {

@@ -5,6 +5,7 @@ import { en } from '../../src/i18n/en.js';
 import { fr } from '../../src/i18n/fr.js';
 import { curriculum } from '../../src/content/curriculum.js';
 import { getWorkshopGenerator } from '../../src/exercises/generators.js';
+import { validateSubmission } from '../../src/exercises/validators.js';
 
 const taskSixDiagnosticKeys = [
   'diagnostic.invalid-ip',
@@ -89,6 +90,34 @@ describe('i18n', () => {
     expect(english.t('diagnostic.unreachable-destination', {
       reason: { messageKey: 'semantic.traceReason.missing-link' },
     })).toContain('missing physical link');
+  });
+
+  it('renders localized device labels from real validation and hint producers', () => {
+    const exercise = getWorkshopGenerator('same-subnet-3')({ seed: 'localized-devices' });
+    const field = exercise.editableFields[0];
+    const validation = validateSubmission(exercise, { ...exercise.solution, [field]: '10.0.0.1' });
+    const diagnostic = validation.diagnostics.find((entry) => entry.code === 'different-subnet');
+    const hint = getHint(exercise, { ...validation, diagnostics: [diagnostic] }, 1);
+    const french = createI18n('fr');
+
+    expect(french.t(diagnostic.messageKey, diagnostic.params)).toContain('Routeur local');
+    expect(french.t(diagnostic.messageKey, diagnostic.params)).not.toContain('router');
+    expect(french.t(hint.key, hint.params)).toContain('Hôte Alpha');
+    expect(french.t(hint.key, hint.params)).not.toContain('host-a');
+  });
+
+  it('keeps semantic field-shape articles grammatical in both locales', () => {
+    const french = createI18n('fr');
+    const english = createI18n('en');
+
+    expect(french.t('hint.gateway.nearSolution', {
+      network: '10.0.0.0',
+      broadcast: '10.0.0.255',
+      expectedShape: { messageKey: 'semantic.shape.prefix' },
+    })).toContain('un préfixe CIDR utilisable');
+    expect(english.t('hint.generic.nearSolution', {
+      expectedShape: { messageKey: 'semantic.shape.network' },
+    })).toContain('expects a network value');
   });
 
   it('keeps missing interpolation placeholders visible and stringifies supplied values safely', () => {

@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   closeSync,
   lstatSync,
@@ -110,6 +110,21 @@ describe('assertPublicPathsSafe', () => {
 
     expect(output).toMatch(/1 emitted file checked/i);
     expect(output).not.toMatch(/tracked file/i);
+
+    writeFileSync(
+      join(distRoot, 'index.html'),
+      '<script src="/net_practice/js/level10.js"></script><p>must-not-leak</p>',
+    );
+    const rejected = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL('../../scripts/public-safety.mjs', import.meta.url)), '--emitted-only'],
+      { cwd: repositoryRoot, encoding: 'utf8' },
+    );
+
+    expect(rejected.status).not.toBe(0);
+    expect(rejected.stderr).toMatch(/index\.html/);
+    expect(rejected.stderr).not.toContain('must-not-leak');
+    expect(rejected.stderr).not.toContain(repositoryRoot);
   });
 
   it('rejects official and temporary material', () => {
