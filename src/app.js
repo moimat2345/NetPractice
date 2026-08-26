@@ -42,7 +42,7 @@ export function createApp(root, dependencies) {
   let progress = dependencies.progress;
   let currentRoute = routeFromHash();
   let workshopController = null;
-  let activeWorkshopId = null;
+  let activeWorkshopKey = null;
 
   const progressView = new Proxy({}, {
     get(_target, property) {
@@ -87,7 +87,7 @@ export function createApp(root, dependencies) {
   function closeWorkshop() {
     workshopController?.destroy();
     workshopController = null;
-    activeWorkshopId = null;
+    activeWorkshopKey = null;
   }
 
   function renderRoute() {
@@ -97,15 +97,17 @@ export function createApp(root, dependencies) {
     shell.setView(definition ? 'workshop' : 'home');
 
     if (definition) {
-      if (workshopController && activeWorkshopId === definition.id) return;
+      const effectiveSeed = requestedWorkshop.seed || `${definition.id}-practice`;
+      const workshopKey = `${definition.id}\u0000${effectiveSeed}`;
+      if (workshopController && activeWorkshopKey === workshopKey) return;
       closeWorkshop();
       workshopController = renderWorkshop({
         i18n,
         definition,
-        seed: requestedWorkshop.seed || `${definition.id}-practice`,
+        seed: effectiveSeed,
         onComplete: recordCompletion,
       });
-      activeWorkshopId = definition.id;
+      activeWorkshopKey = workshopKey;
       shell.outlet.replaceChildren(workshopController.element);
       return;
     }

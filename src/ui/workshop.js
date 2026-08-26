@@ -47,6 +47,40 @@ function copyState(state) {
   };
 }
 
+function captureFocus(root) {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || !root.contains(active) || !active.dataset.focusKey) return null;
+  const snapshot = { key: active.dataset.focusKey, selection: null };
+  if (active instanceof HTMLInputElement) {
+    snapshot.selection = {
+      start: active.selectionStart,
+      end: active.selectionEnd,
+      direction: active.selectionDirection,
+    };
+  }
+  return snapshot;
+}
+
+function restoreFocus(root, snapshot) {
+  if (!snapshot) return;
+  const target = [...root.querySelectorAll('[data-focus-key]')]
+    .find((node) => node.dataset.focusKey === snapshot.key);
+  if (!(target instanceof HTMLElement)) return;
+  target.focus({ preventScroll: true });
+  if (target instanceof HTMLInputElement && snapshot.selection) {
+    try {
+      target.setSelectionRange(
+        snapshot.selection.start,
+        snapshot.selection.end,
+        snapshot.selection.direction,
+      );
+    } catch {
+      // Some input types do not expose a text selection. Focus restoration
+      // still remains useful for those controls.
+    }
+  }
+}
+
 export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }) {
   if (!definition) throw new TypeError('A workshop definition is required');
   const root = element('article', { className: 'workshop-view' });
@@ -114,6 +148,7 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
         autocomplete: 'off',
         spellcheck: 'false',
         'aria-describedby': `${inputId}-note`,
+        'data-focus-key': `field:${field}`,
         onInput: (event) => {
           state.submission[field] = event.currentTarget.value;
         },
@@ -128,6 +163,7 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
   }
 
   function render() {
+    const focusSnapshot = captureFocus(root);
     root.dataset.exerciseSeed = state.seed;
     root.dataset.workshopPhase = state.phase;
     const hint = state.hintLevel > 0 ? getHint(exercise, state.validation, state.hintLevel) : null;
@@ -156,20 +192,27 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
       ]),
       renderFields(),
       element('div', { className: 'workshop-actions' }, [
-        element('button', { className: 'button button-primary', type: 'submit' }, [i18n.t('action.check')]),
+        element('button', {
+          className: 'button button-primary',
+          type: 'submit',
+          'data-focus-key': 'action:check',
+        }, [i18n.t('action.check')]),
         state.hintLevel < 3 && element('button', {
           className: 'button button-secondary',
           type: 'button',
+          'data-focus-key': 'action:hint',
           onClick: revealHint,
         }, [i18n.t('action.hint', { level: state.hintLevel + 1 })]),
         state.validation && !state.validation.ok && element('button', {
           className: 'button button-text',
           type: 'button',
+          'data-focus-key': 'action:correction',
           onClick: toggleCorrection,
         }, [i18n.t(state.phase === 'correction' ? 'action.hideSolution' : 'action.showSolution')]),
         state.attempts > 0 && element('button', {
           className: 'button button-secondary',
           type: 'button',
+          'data-focus-key': 'action:new-exercise',
           onClick: newExercise,
         }, [i18n.t('action.newExercise')]),
       ]),
@@ -184,6 +227,7 @@ export function renderWorkshop({ i18n, definition, seed, onComplete = () => {} }
     ]);
 
     replace(root, [lesson, form, feedback, state.phase === 'correction' && renderCorrection(i18n, exercise)]);
+    restoreFocus(root, focusSnapshot);
   }
 
   const unsubscribe = i18n.subscribe(render);
