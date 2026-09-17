@@ -31,12 +31,17 @@ export function renderHome({ i18n, progress, sections = [], onNavigate = () => {
   const examAttemptSeed = createExamAttemptSeed();
   const nextWorkshop = nextWorkshopId(sections, progress);
   const pathStarted = sections.some((section) => sectionStarted(section, progress));
-  const heroLabel = nextWorkshop
+  const current = progress.current;
+  const resumeRoute = current?.kind === 'exam' && !progress.exams.some((exam) => exam.seed === current.seed)
+    ? `/exam?seed=${encodeURIComponent(current.seed)}`
+    : current?.kind === 'workshop' && sections.some((section) => section.workshops.includes(current.id)) && !progress.completed[current.id]
+      ? `/workshops/${current.id}?seed=${encodeURIComponent(current.seed)}` : null;
+  const heroLabel = resumeRoute ? i18n.t('workspace.resume') : nextWorkshop
     ? i18n.t(pathStarted ? 'action.continue' : 'home.startFirst')
     : i18n.t('action.startExam');
-  const heroRoute = nextWorkshop
+  const heroRoute = resumeRoute ?? (nextWorkshop
     ? `/workshops/${nextWorkshop}`
-    : `/exam?seed=${encodeURIComponent(examAttemptSeed)}`;
+    : `/exam?seed=${encodeURIComponent(examAttemptSeed)}`);
   const home = element('div', { className: 'home-view' });
   const heroCopy = element('div', { className: 'hero-copy' }, [
     element('p', { className: 'eyebrow' }, [i18n.t('course.eyebrow')]),

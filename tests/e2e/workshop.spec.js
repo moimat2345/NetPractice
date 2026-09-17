@@ -56,6 +56,7 @@ test('renders the workshop lesson module and translates it without losing focus'
   const lesson = page.locator('[data-workshop-lesson="subnet-range-1"]');
   await expect(lesson.getByRole('heading', { level: 1 })).toHaveText('Trouve les limites du réseau');
   await expect(lesson).toContainText('blocs de 32');
+  await lesson.locator('summary').click();
   await expect(lesson.getByRole('listitem')).toHaveCount(3);
   await expect(lesson).toContainText('Prêt à borner un sous-réseau');
   await expect(page.getByRole('heading', { level: 2 })).toHaveText('Calcule les adresses réseau et de diffusion du bloc.');
@@ -107,13 +108,13 @@ test('records a successful attempt and refreshes the shell progress', async ({ p
     }));
   });
   await page.goto('/#/workshops/subnet-range-1?seed=e2e-success');
-  await expect(page.getByRole('banner').getByText('0 / 6')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('3 / 19')).toBeVisible();
   await page.getByLabel(/adresse réseau/i).fill('10.195.32.0');
   await page.getByLabel(/adresse de diffusion/i).fill('10.195.32.63');
   await page.getByRole('button', { name: /tester le réseau/i }).click();
 
   await expect(page.locator('[data-workshop-phase="correct"]')).toBeVisible();
-  await expect(page.getByRole('banner').getByText('1 / 6')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('4 / 19')).toBeVisible();
   await expect.poll(async () => page.evaluate(() =>
     JSON.parse(localStorage.getItem('subnet-notes-progress'))?.completed?.['subnet-range-1']?.attempts)).toBe(1);
 

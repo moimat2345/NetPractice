@@ -1,6 +1,81 @@
 import { expect, test } from '@playwright/test';
 
 const missionUrl = '/#/workshops/guided-mission-1?seed=responsive';
+const branchMissionUrl = '/#/workshops/guided-mission-2?seed=responsive';
+
+async function layoutProblems(page) {
+  return page.locator('[data-topology]').evaluate((canvas) => {
+    const bounds = canvas.getBoundingClientRect();
+    const nodes = [...canvas.querySelectorAll('[data-device-id]')]
+      .map((node) => ({ id: node.dataset.deviceId, rect: node.getBoundingClientRect() }));
+    const problems = [];
+    nodes.forEach(({ id, rect }, index) => {
+      if (rect.left < bounds.left || rect.right > bounds.right
+        || rect.top < bounds.top || rect.bottom > bounds.bottom) problems.push(`clipped:${id}`);
+      nodes.slice(index + 1).forEach(({ id: otherId, rect: other }) => {
+        if (Math.min(rect.right, other.right) > Math.max(rect.left, other.left)
+          && Math.min(rect.bottom, other.bottom) > Math.max(rect.top, other.top)) {
+          problems.push(`overlap:${id}:${otherId}`);
+        }
+      });
+    });
+    return problems;
+  });
+}
+
+test('keeps every branch device separate and inside a resized container', async ({ page }, testInfo) => {
+  test.skip(!['desktop', 'portrait'].includes(testInfo.project.name));
+  await page.goto(branchMissionUrl);
+  await expect(page.locator('[data-device-id]')).toHaveCount(8);
+  await expect.poll(() => layoutProblems(page)).toEqual([]);
+  // A workspace can shrink without a viewport resize (e.g. alongside another panel).
+  await page.locator('[data-topology]').evaluate((canvas) => { canvas.style.width = '560px'; });
+  await expect.poll(() => layoutProblems(page)).toEqual([]);
+  await expect.poll(async () => (await linkMetrics(page)).every((link) =>
+    link.renderedStart <= 1 && link.renderedEnd <= 1)).toBe(true);
+  await page.locator('[data-topology]').evaluate((canvas) => { canvas.style.width = '320px'; });
+  await expect(page.locator('[data-topology-mode="stacked"]')).toBeVisible();
+  await expect(page.locator('[data-device-id="grove"] [data-neighbor-id="delta"]')).toBeVisible();
+  await expect.poll(() => layoutProblems(page)).toEqual([]);
+  await page.locator('[data-topology]').evaluate((canvas) => { canvas.style.width = '560px'; });
+  await expect(page.locator('[data-topology-mode="diagram"]')).toBeVisible();
+  await expect.poll(() => layoutProblems(page)).toEqual([]);
+  await expect.poll(async () => (await linkMetrics(page)).every((link) =>
+    link.renderedStart <= 1 && link.renderedEnd <= 1)).toBe(true);
+});
+
+test('fits the desktop branch diagram in 500 pixels without shrinking device labels', async ({ page }, testInfo) => {
+  test.skip(!['desktop', 'portrait'].includes(testInfo.project.name));
+  await page.goto(branchMissionUrl);
+  const canvas = page.locator('[data-topology]');
+  for (const width of [500, 560, 650]) {
+    await canvas.evaluate((element, nextWidth) => { element.style.width = `${nextWidth}px`; }, width);
+    await expect(canvas).toHaveAttribute('data-topology-mode', 'diagram');
+    await expect.poll(async () => (await canvas.boundingBox()).height).toBeLessThanOrEqual(500);
+    await expect.poll(() => layoutProblems(page)).toEqual([]);
+    const fontSizes = await canvas.locator('[data-device-id] strong').evaluateAll((labels) =>
+      labels.map((label) => Number.parseFloat(getComputedStyle(label).fontSize)));
+    expect(fontSizes.every((size) => size >= 12)).toBe(true);
+    await expect.poll(async () => (await linkMetrics(page)).every((link) =>
+      link.renderedStart <= 1 && link.renderedEnd <= 1)).toBe(true);
+  }
+});
+
+test('shows the actual branch neighbors on mobile', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile');
+  await page.goto(branchMissionUrl);
+  const grove = page.locator('[data-device-id="grove"]');
+  await expect(grove.locator('[data-neighbor-id]')).toHaveCount(3);
+  expect(await grove.locator('[data-neighbor-id]').evaluateAll((neighbors) =>
+    neighbors.map((neighbor) => neighbor.dataset.neighborId).sort())).toEqual(['delta', 'echo', 'relay']);
+  await expect(grove).toContainText(/relié à|connected to/i);
+  for (const neighbor of await grove.locator('[data-neighbor-id]').all()) await expect(neighbor).toBeVisible();
+  await expect(page.locator('[data-device-id="delta"] [data-neighbor-id="grove"]')).toBeVisible();
+  await page.locator('[data-device-id="delta"]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-device-config="delta"]')).toBeVisible();
+  await expect(page.locator('[data-device-id="delta"]')).toBeFocused();
+});
 
 async function linkMetrics(page) {
   return page.locator('[data-topology]').evaluate((canvas) => {
@@ -125,7 +200,7 @@ test('does not enqueue link work after the topology is destroyed', async ({ page
   expect(await page.evaluate(() => window.__topologyLifecycle.frameRequests)).toBe(before);
 });
 
-test('uses a packet-ordered stacked list without horizontal overflow on mobile', async ({ page }, testInfo) => {
+test('uses packet-ordered neighbor cards without horizontal overflow on mobile', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile');
   await page.goto(missionUrl);
 
@@ -134,6 +209,7 @@ test('uses a packet-ordered stacked list without horizontal overflow on mobile',
   const deviceOrder = await page.locator('[data-device-id]').evaluateAll((nodes) =>
     nodes.map((node) => node.dataset.deviceId));
   expect(deviceOrder).toEqual(['internet', 'atlas', 'orme', 'alpha', 'gamma', 'boreal', 'beta']);
+  await expect(page.locator('[data-device-id="alpha"] [data-neighbor-id="orme"]')).toBeVisible();
   await page.getByRole('button', { name: /alpha/i }).first().click();
   const controlMetrics = await page.locator('[data-device-config="alpha"] input').first().evaluate((input) => {
     const style = getComputedStyle(input);

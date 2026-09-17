@@ -1,10 +1,19 @@
 import { generateMission } from '../exercises/generators.js';
 import { validateSubmission } from '../exercises/validators.js';
 import { renderDeviceConfig } from './device-config.js';
+import { renderExerciseGoals } from './exercise-goals.js';
 import { element, replace } from './dom.js';
 import { createTopology } from './topology.js';
 
 const EXAM_MISSION_COUNT = 3;
+const EXAM_SNAPSHOT_VERSION = 1;
+const MAX_FIELD_LENGTH = 256;
+const DIAGNOSTIC_CODES = new Set([
+  'not-submitted', 'invalid-ip', 'invalid-mask', 'incorrect-calculation', 'network-address',
+  'broadcast-address', 'different-subnet', 'overlapping-subnets', 'duplicate-address',
+  'unreachable-gateway', 'unreachable-next-hop', 'missing-default-route', 'wrong-route-destination',
+  'wrong-default-gateway', 'unreachable-destination', 'missing-return-path',
+]);
 const ANNOUNCEMENT_THRESHOLDS = [
   { seconds: 300, code: 'five-minutes' },
   { seconds: 60, code: 'one-minute' },
@@ -58,8 +67,40 @@ function restoreFocus(root, snapshot) {
 function diagnosticCodes(validation) {
   const codes = validation?.diagnostics
     ?.map((diagnostic) => diagnostic?.code)
-    .filter((code) => typeof code === 'string' && code.length > 0) ?? [];
+    .filter((code) => DIAGNOSTIC_CODES.has(code)) ?? [];
   return [...new Set(codes)];
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function sanitizedCodes(value) {
+  return Array.isArray(value) ? [...new Set(value.filter((code) => DIAGNOSTIC_CODES.has(code)))] : [];
+}
+
+function sanitizedCheck(mission, value) {
+  if (!isRecord(value)) return null;
+  const deviceIds = new Set(mission.devices.map((device) => device.id));
+  const paths = Array.isArray(value.failedPaths) ? value.failedPaths : [];
+  return {
+    diagnosticCodes: sanitizedCodes(value.diagnosticCodes),
+    affectedDeviceIds: Array.isArray(value.affectedDeviceIds)
+      ? [...new Set(value.affectedDeviceIds.filter((id) => deviceIds.has(id)))] : [],
+    failedPaths: paths.filter((path) => isRecord(path)
+      && ['forward', 'return'].includes(path.direction)
+      && mission.goals.some((goal) => goal.sourceId === path.sourceId && goal.destinationId === path.destinationId))
+      .slice(0, mission.goals.length)
+      .map(({ sourceId, destinationId, direction }) => ({ sourceId, destinationId, direction })),
+  };
+}
+
+function validAttempt(value, seed, durationSeconds, now) {
+  return isRecord(value) && value.version === EXAM_SNAPSHOT_VERSION && value.seed === seed
+    && value.durationSeconds === durationSeconds
+    && Number.isSafeInteger(value.startedAt) && value.startedAt >= 0 && value.startedAt <= now
+    && value.deadline === value.startedAt + durationSeconds * 1_000
+    && ['running', 'complete', 'expired'].includes(value.status);
 }
 
 function liveCheckSummary(mission, validation) {
@@ -92,6 +133,8 @@ export function createExamState({
   clock = Date,
   durationSeconds = 900,
   missionCount = EXAM_MISSION_COUNT,
+  savedAttempt = null,
+  onSave = () => {},
   onFinalize = () => {},
 } = {}) {
   if (typeof seed !== 'string' || seed.length === 0) throw new TypeError('An exam seed is required');
@@ -99,13 +142,17 @@ export function createExamState({
   if (!Number.isInteger(durationSeconds) || durationSeconds <= 0) throw new RangeError('Exam duration must be positive');
   if (!clock || typeof clock.now !== 'function') throw new TypeError('A clock with now() is required');
 
-  const startedAt = clock.now();
+  const now = clock.now();
+  const restored = validAttempt(savedAttempt, seed, durationSeconds, now) ? savedAttempt : null;
+  const startedAt = restored?.startedAt ?? now;
+  const deadline = startedAt + durationSeconds * 1_000;
   const missions = immutableCopy(Array.from({ length: EXAM_MISSION_COUNT }, (_, index) =>
     generateMission({ seed: `${seed}:${index}`, difficulty: 3 })));
   const submissions = missions.map((mission) => ({ ...mission.initial }));
   const results = Array(EXAM_MISSION_COUNT).fill(null);
   const lastDiagnosticCodes = Array.from({ length: EXAM_MISSION_COUNT }, () => []);
   const checks = Array(EXAM_MISSION_COUNT).fill(null);
+  const selectedDevices = missions.map((mission) => mission.devices[0]?.id ?? null);
   const announcements = [];
   const announced = new Set();
   let currentIndex = 0;
@@ -113,6 +160,35 @@ export function createExamState({
   let status = 'running';
   let finalizedElapsed = null;
   let finalRecord = null;
+
+  if (restored) {
+    missions.forEach((mission, index) => {
+      const savedSubmission = restored.submissions?.[index];
+      for (const field of mission.editableFields) {
+        const value = isRecord(savedSubmission) ? savedSubmission[field] : undefined;
+        if (typeof value === 'string' && value.length <= MAX_FIELD_LENGTH) submissions[index][field] = value;
+      }
+      checks[index] = sanitizedCheck(mission, restored.checks?.[index]);
+      lastDiagnosticCodes[index] = checks[index]?.diagnosticCodes ?? [];
+      const result = restored.results?.[index];
+      if (result?.missionSeed === mission.seed && result.passed === true
+        && validateSubmission(mission, submissions[index]).ok) {
+        results[index] = missionResult(mission.seed, true);
+        checks[index] = null;
+      } else if (result?.passed === false) {
+        lastDiagnosticCodes[index] = sanitizedCodes(result.diagnosticCodes);
+      }
+      const deviceId = restored.selectedDevices?.[index];
+      if (mission.devices.some((device) => device.id === deviceId)) selectedDevices[index] = deviceId;
+    });
+    if (Number.isInteger(restored.index) && restored.index >= 0 && restored.index < missions.length) {
+      currentIndex = restored.index;
+    }
+    previousRemaining = Math.max(0, durationSeconds - Math.floor((now - startedAt) / 1_000));
+    for (const threshold of ANNOUNCEMENT_THRESHOLDS) {
+      if (previousRemaining <= threshold.seconds) announced.add(threshold.code);
+    }
+  }
 
   function elapsedSeconds() {
     if (finalizedElapsed !== null) return finalizedElapsed;
@@ -123,7 +199,33 @@ export function createExamState({
     return Math.max(0, durationSeconds - elapsedSeconds());
   }
 
-  function finalize(nextStatus) {
+  function snapshotData() {
+    return immutableCopy({
+      version: EXAM_SNAPSHOT_VERSION,
+      seed,
+      startedAt,
+      deadline,
+      durationSeconds,
+      index: currentIndex,
+      remainingSeconds: remainingSeconds(),
+      elapsedSeconds: elapsedSeconds(),
+      status,
+      results,
+      submissions,
+      checks,
+      selectedDevices,
+    });
+  }
+
+  function save() {
+    try {
+      onSave(snapshotData());
+    } catch {
+      // A persistence failure must not interrupt an exam in progress.
+    }
+  }
+
+  function finalize(nextStatus, notify = true) {
     if (status !== 'running') return finalRecord;
     finalizedElapsed = elapsedSeconds();
     status = nextStatus;
@@ -145,7 +247,8 @@ export function createExamState({
       status,
       missions: results,
     });
-    onFinalize(finalRecord);
+    save();
+    if (notify) onFinalize(finalRecord);
     return finalRecord;
   }
 
@@ -174,18 +277,40 @@ export function createExamState({
     return afterIndex;
   }
 
+  if (restored?.status !== 'running' && restored) {
+    const validCompletion = restored.status === 'complete' && results.every((result) => result?.passed)
+      && Number.isInteger(restored.elapsedSeconds) && restored.elapsedSeconds >= 0
+      && restored.elapsedSeconds <= durationSeconds;
+    finalizedElapsed = validCompletion ? restored.elapsedSeconds : durationSeconds;
+    finalize(validCompletion ? 'complete' : 'expired', false);
+  } else {
+    if (results[currentIndex]?.passed) currentIndex = nextUnfinished(currentIndex);
+    synchronize();
+    save();
+  }
+
   return {
     missions,
+    resumed: restored !== null,
     select(index) {
       synchronize();
       if (status !== 'running' || !Number.isInteger(index) || index < 0 || index >= missions.length) return false;
       currentIndex = index;
+      save();
+      return true;
+    },
+    selectDevice(deviceId, index = currentIndex) {
+      synchronize();
+      if (status !== 'running' || !missions[index]?.devices.some((device) => device.id === deviceId)) return false;
+      selectedDevices[index] = deviceId;
+      save();
       return true;
     },
     update(field, value, index = currentIndex) {
       synchronize();
       if (status !== 'running' || results[index] !== null || !missions[index]?.editableFields.includes(field)) return false;
-      submissions[index][field] = String(value);
+      submissions[index][field] = String(value).slice(0, MAX_FIELD_LENGTH);
+      save();
       return true;
     },
     submit(index = currentIndex, validation = null) {
@@ -195,12 +320,13 @@ export function createExamState({
       }
       const passed = validation?.ok === true;
       lastDiagnosticCodes[index] = diagnosticCodes(validation);
-      checks[index] = passed ? null : liveCheckSummary(missions[index], validation);
+      checks[index] = passed ? null : sanitizedCheck(missions[index], liveCheckSummary(missions[index], validation));
       if (passed) {
         results[index] = missionResult(missions[index].seed, true);
         if (results.every(Boolean)) finalize('complete');
         else currentIndex = nextUnfinished(index);
       }
+      save();
       return { accepted: true, passed };
     },
     submission(index = currentIndex) {
@@ -213,16 +339,7 @@ export function createExamState({
     },
     snapshot() {
       synchronize();
-      return immutableCopy({
-        seed,
-        index: currentIndex,
-        remainingSeconds: remainingSeconds(),
-        elapsedSeconds: elapsedSeconds(),
-        status,
-        results,
-        submissions,
-        checks,
-      });
+      return snapshotData();
     },
   };
 }
@@ -277,13 +394,15 @@ function resultSummary(i18n, result, index) {
   ]);
 }
 
-export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) {
+export function renderExam({
+  i18n, seed, clock = Date, savedAttempt = null, onSave = () => {}, onFinalize = () => {}, onNavigate = null,
+}) {
   const root = element('article', {
     className: 'exam-view',
     'data-exam-seed': seed,
   });
-  const state = createExamState({ seed, clock, onFinalize });
-  const selectedDevices = state.missions.map((mission) => mission.devices[0]?.id ?? null);
+  const state = createExamState({ seed, clock, savedAttempt, onSave, onFinalize });
+  const restartRoute = `/exam?seed=mock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   let topologyController = null;
   let timerText = null;
   let liveRegion = null;
@@ -384,14 +503,14 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
       i18n,
       devices: mission.devices,
       links: mission.links,
-      selectedDeviceId: selectedDevices[snapshot.index],
+      selectedDeviceId: snapshot.selectedDevices[snapshot.index],
       deviceStatuses: deviceStatuses(mission, missingFields, check),
       onSelect: (deviceId) => {
-        selectedDevices[snapshot.index] = deviceId;
+        if (!state.selectDevice(deviceId)) return;
         render();
       },
     });
-    const selectedDevice = mission.devices.find((device) => device.id === selectedDevices[snapshot.index]);
+    const selectedDevice = mission.devices.find((device) => device.id === snapshot.selectedDevices[snapshot.index]);
     const form = element('form', {
       className: 'exam-form workshop-form',
       onSubmit: (event) => {
@@ -411,21 +530,27 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
         element('p', { className: 'note-label' }, [i18n.t('course.objective')]),
         element('h2', {}, [i18n.t('exam.objective')]),
       ]),
-      topologyController.element,
-      renderDeviceConfig({
-        i18n,
-        device: selectedDevice,
-        devices: mission.devices,
-        links: mission.links,
-        submission,
-        missingFields,
-        onChange: (field, value) => {
-          const wasMissing = String(submission[field] ?? '').trim().length === 0;
-          if (!state.update(field, value)) return;
-          const isMissing = String(value).trim().length === 0;
-          if (wasMissing !== isMissing) render();
-        },
-      }),
+      renderExerciseGoals(i18n, mission),
+      element('div', { className: 'exercise-workspace' }, [
+        topologyController.element,
+        element('div', { className: 'exercise-editor' }, [
+          renderDeviceConfig({
+            i18n,
+            device: selectedDevice,
+            devices: mission.devices,
+            links: mission.links,
+            submission,
+            missingFields,
+            onSelect: (deviceId) => { if (state.selectDevice(deviceId)) render(); },
+            onChange: (field, value) => {
+              const wasMissing = String(submission[field] ?? '').trim().length === 0;
+              if (!state.update(field, value)) return;
+              const isMissing = String(value).trim().length === 0;
+              if (wasMissing !== isMissing) render();
+            },
+          }),
+        ]),
+      ]),
       element('div', { className: 'workshop-actions' }, [
         element('button', {
           className: 'button button-primary',
@@ -435,6 +560,10 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
       ]),
       renderLiveCheck(mission, check),
     ]);
+    const editor = form.querySelector('.exercise-editor');
+    editor.append(form.querySelector('.workshop-actions'));
+    const diagnostics = form.querySelector('.exam-live-diagnostics');
+    if (diagnostics) editor.append(diagnostics);
     return form;
   }
 
@@ -456,6 +585,16 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
       element('div', { className: 'exam-result-list' }, snapshot.results.map((result, index) =>
         resultSummary(i18n, result, index))),
       element('p', { className: 'exam-saved-note' }, [i18n.t('result.saved')]),
+      element('a', {
+        className: 'button button-primary',
+        href: `#${restartRoute}`,
+        'data-focus-key': 'exam:restart',
+        onClick: (event) => {
+          if (!onNavigate || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          onNavigate(restartRoute);
+        },
+      }, [i18n.t('exam.restart')]),
     ]);
   }
 
@@ -481,6 +620,8 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
         element('p', { className: 'eyebrow' }, [i18n.t('course.exam.eyebrow')]),
         element('h1', {}, [i18n.t('exam.title')]),
         element('p', {}, [i18n.t('exam.intro')]),
+        state.resumed && snapshot.status === 'running'
+          && element('p', { className: 'exam-resumed-note' }, [i18n.t('exam.resumed')]),
       ]),
       snapshot.status === 'running' && element('div', {
         className: 'exam-timer',
@@ -524,7 +665,7 @@ export function renderExam({ i18n, seed, clock = Date, onFinalize = () => {} }) 
 
   const unsubscribe = i18n.subscribe(render);
   render();
-  interval = setInterval(tick, 1_000);
+  if (state.snapshot().status === 'running') interval = setInterval(tick, 1_000);
 
   return {
     element: root,

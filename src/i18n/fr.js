@@ -1,4 +1,9 @@
+import { practiceFr } from './practice.js';
+import { workspaceFr } from './workspace.js';
+
 export const fr = {
+  practice: practiceFr,
+  workspace: workspaceFr,
   app: {
     name: 'Subnet Notes',
     documentTitle: 'Subnet Notes — Apprendre IPv4 et le routage en pratiquant',
@@ -124,6 +129,7 @@ export const fr = {
     noSelection: 'Choisis un appareil pour consulter sa configuration.',
   },
   topology: {
+    connectedTo: 'Relié à',
     interfaces: 'Interfaces',
     routes: 'Routes ordonnées',
     segment: 'Segment LAN',
@@ -298,6 +304,8 @@ export const fr = {
     return: 'Trace enfin le retour de {returnSource} vers {returnDestination} avec la même méthode ; un aller réussi ne suffit pas.',
   },
   exam: {
+    resumed: 'Session reprise : le temps continue depuis le départ.',
+    restart: 'Commencer une nouvelle évaluation',
     title: 'Évaluation blanche',
     intro: 'Trois missions originales, quinze minutes, sans indices.',
     objective: 'Rétablis toutes les communications de cette mission.',

@@ -1,0 +1,105 @@
+/* A compact exercise desk, with the existing paper and network palette. */
+.content-column { min-width: 0; }
+.language-option { min-width: 44px; min-height: 44px; }
+.workshop-view, .exam-view { width: 100%; padding: 1.75rem clamp(1rem, 2.5vw, 2rem) 3rem; }
+.workshop-lesson { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 1rem; padding-bottom: 1.25rem; }
+.workshop-lesson h1, .exam-header h1 { font-size: clamp(2rem, 3.2vw, 3rem); margin-bottom: .65rem; }
+.workshop-lesson .eyebrow { margin-bottom: .5rem; }
+.lesson-details summary, .exercise-details summary { cursor: pointer; min-height: 44px; padding-block: .5rem; color: var(--network-link); font-weight: 650; }
+.lesson-details[open] { max-width: 62ch; }
+.lesson-details .workshop-intro { margin-block: .5rem 1rem; }
+.exercise-note { padding: .8rem 1rem; max-width: 260px; }
+.exercise-note strong { white-space: nowrap; font-size: .85rem; }
+.workshop-form { margin-top: 1.25rem; padding: clamp(.85rem, 2vw, 1.4rem); }
+.workshop-form-heading h2 { font-size: clamp(1.35rem, 2vw, 1.8rem); margin-bottom: .75rem; }
+.exercise-workspace, .exercise-editor { min-width: 0; }
+.exercise-workspace { display: grid; gap: 1rem; align-items: start; }
+.exercise-workspace.is-simple { display: block; }
+.exercise-workspace .device-config { width: 100%; margin-top: 0; padding: 1rem; }
+.exercise-goals { margin-bottom: 1rem; padding: .7rem 1rem; border-left: 3px solid var(--network-link); background: var(--network-soft); }
+.exercise-goals .note-label { margin-bottom: .3rem; }
+.exercise-goals ul { display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; padding: 0; margin: 0; list-style: none; font-size: .85rem; }
+.device-config-group h4, .config-entry-id, .device-field label { font-size: .8rem; }
+.config-entry-id { font-family: inherit; overflow-wrap: normal; }
+.device-field small, .workshop-field small { font-size: .75rem; color: var(--muted-ink); }
+.device-field-value { white-space: nowrap; font-size: .85rem; padding-inline: .5rem; }
+.device-field input, .workshop-field input { min-height: 46px; font-size: 1rem; border: 2px solid var(--network-link); background: var(--sheet); }
+.device-field.is-missing input, .device-field input[aria-invalid="true"] { border-color: var(--accent-dark); border-style: solid; }
+.config-entry-fields { grid-template-columns: minmax(150px, 1fr) minmax(74px, .5fr); }
+.config-entry-fields.route-fields { grid-template-columns: minmax(150px, 1fr) minmax(74px, .5fr); }
+.route-fields > .device-field:last-child { grid-column: 1 / -1; }
+.workshop-fields { margin-top: .5rem; }
+.workshop-actions { margin-top: 1.25rem; gap: .65rem; }
+.workshop-pager { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; margin-top: 1.5rem; font-size: .85rem; }
+.workshop-pager a { display: inline-flex; align-items: center; min-height: 44px; }
+.exercise-details { margin-top: .75rem; border-top: 1px solid var(--rule); font-size: .8rem; }
+.exercise-details small { display: block; overflow-wrap: anywhere; margin-top: .5rem; }
+.curriculum-workshops { padding-left: .75rem; margin: .25rem 0 .8rem; list-style: none; }
+.curriculum-workshops a { display: block; padding: .6rem .4rem; color: var(--muted-ink); font-size: .8rem; text-decoration: none; }
+.curriculum-workshops a[aria-current="page"] { background: var(--network-soft); color: var(--ink); border-left: 2px solid var(--network-link); font-weight: 700; }
+.curriculum-nav { max-height: calc(100vh - 4rem); overflow-y: auto; }
+.mobile-curriculum { display: none; }
+.exam-header { position: sticky; top: 0; z-index: 8; padding: .75rem 0; gap: 1rem; background: var(--paper); align-items: center; }
+.exam-header .eyebrow { margin-bottom: .25rem; }
+.exam-header h1 { font-size: clamp(1.35rem, 2.5vw, 2rem); margin-bottom: 0; }
+.exam-header p:last-child:not(.eyebrow) { max-width: 60ch; font-size: .8rem; margin-top: .3rem; }
+.exam-timer { min-width: 112px; padding: .55rem .7rem; box-shadow: none; }
+.exam-timer-value { font-size: 1.6rem; }
+.exam-resumed-note { color: var(--muted-ink); font-size: .85rem; }
+@media (min-width: 1180px) {
+  .exercise-workspace:not(.is-simple) { grid-template-columns: minmax(0, 1fr) minmax(360px, .9fr); }
+  .exercise-editor .device-config-groups { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1179px) {
+  .app-frame[data-view="workshop"] .mobile-curriculum { display: block; }
+  .mobile-curriculum { margin: .6rem 1rem 0; padding: 0 .75rem; border: 1px solid var(--rule-strong); background: var(--sheet); }
+  .mobile-curriculum > summary { padding: .7rem 0; min-height: 44px; cursor: pointer; font-size: .85rem; font-weight: 650; }
+  .mobile-curriculum nav { max-height: 60vh; overflow-y: auto; padding-block: .5rem; }
+  .mobile-curriculum .curriculum-workshops a { font-size: .9rem; min-height: 44px; }
+}
+@media (max-width: 759px) {
+  .workshop-view, .exam-view { padding-top: 1rem; }
+  .workshop-lesson { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+  .workshop-lesson h1 { font-size: 2rem; }
+  .exercise-note { max-width: none; padding: .6rem .75rem; box-shadow: none; }
+  .exercise-note span { display: none; }
+  .device-config-groups { grid-template-columns: minmax(0, 1fr); }
+  .exam-header { display: flex; }
+  .exam-header .eyebrow, .exam-header p:last-child:not(.eyebrow) { display: none; }
+  .exam-timer { min-width: 96px; width: auto; text-align: right; }
+  .exam-timer-value { font-size: 1.35rem; }
+}
+@media (max-width: 420px) {
+  .config-entry-fields, .config-entry-fields.route-fields { grid-template-columns: minmax(0, 1fr); }
+  .route-fields > .device-field:last-child { grid-column: auto; }
+}
+.device-picker { display: grid; gap: .4rem; margin-bottom: 1rem; font-size: .8rem; color: var(--muted-ink); }
+.device-picker select { width: 100%; min-height: 44px; padding: .5rem; border: 1px solid var(--rule-strong); background: var(--sheet); color: var(--ink); font-size: 1rem; }
+@media (max-width: 759px) {
+  .exercise-editor { order: -1; }
+  .exercise-note span { display: block; }
+  .exercise-note { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .75rem; }
+}
+/* Desktop is the primary workspace: keep context short and controls at hand. */
+@media (min-width: 1180px) {
+  .app-frame[data-view="workshop"] .app-body { grid-template-columns: 220px minmax(0, 1fr); }
+  .app-frame[data-view="workshop"] .curriculum-sidebar { padding-inline: 1.25rem; }
+  .device-field input { scroll-margin-block: 120px; }
+  .workshop-view, .exam-view { padding-top: .75rem; }
+  .workshop-lesson .eyebrow { display: none; }
+  .workshop-lesson h1 { max-width: none; font-size: 2rem; letter-spacing: -.04em; line-height: 1.1; margin-bottom: .4rem; }
+  .workshop-lesson { padding-bottom: .5rem; }
+  .lesson-details summary { min-height: 32px; padding-block: .3rem; }
+  .workshop-form { margin-top: .75rem; padding-block: 1rem; }
+  .workshop-form-heading .note-label { display: none; }
+  .exercise-goals { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem 1rem; padding: .55rem .75rem; }
+  .exercise-goals .note-label { margin-bottom: 0; }
+  .workshop-form-heading { max-width: none; margin-bottom: 1rem; }
+  .workshop-form-heading h2 { font-size: 1.4rem; line-height: 1.2; }
+  .device-picker { display: none; }
+  .device-config-heading { padding-bottom: .65rem; }
+  .device-config-heading h3 { font-size: 1.4rem; }
+  .device-config-groups { margin-top: .8rem; gap: 1rem; }
+  .config-entry { padding-block: .6rem; }
+  .exercise-editor > .workshop-actions { position: sticky; bottom: 1rem; z-index: 3; padding: .75rem; border: 1px solid var(--rule-strong); background: var(--sheet); box-shadow: 0 4px 16px rgb(61 50 36 / 10%); }
+}

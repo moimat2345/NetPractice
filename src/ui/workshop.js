@@ -8,6 +8,7 @@ import { renderDeviceConfig } from './device-config.js';
 import { element, replace } from './dom.js';
 import { renderCorrection, renderDiagnostic, renderHint } from './feedback.js';
 import { createTopology } from './topology.js';
+import { renderExerciseGoals } from './exercise-goals.js';
 
 function makeExercise(definition, seed) {
   const generate = getWorkshopGenerator(definition.id);
@@ -103,13 +104,20 @@ export function renderWorkshop({
   onComplete = () => {},
   onNavigate = () => {},
   nextTarget = null,
+  previousTarget = null,
+  savedAttempt = null,
+  onSave = () => {},
 }) {
   if (!definition) throw new TypeError('A workshop definition is required');
   const root = element('article', { className: 'workshop-view', 'data-workshop': definition.id });
   let variation = 0;
-  let exercise = makeExercise(definition, String(seed));
+  const exercise = makeExercise(definition, String(seed));
   let recordedSeed = null;
   let topologyController = null;
+  let lessonOpen = false;
+  let detailsOpen = false;
+  const simple = ['ipv4-validity-1', 'ipv4-octets-2', 'mask-conversion-1', 'subnet-range-1', 'usable-host-2'].includes(definition.id);
+  const syntaxOnly = ['ipv4-validity-1', 'ipv4-octets-2'].includes(definition.id);
   const state = {
     phase: 'ready',
     hintLevel: 0,
@@ -117,8 +125,44 @@ export function renderWorkshop({
     seed: exercise.seed,
     submission: { ...exercise.initial },
     validation: null,
-    selectedDeviceId: exercise.devices[0]?.id ?? null,
+    selectedDeviceId: exercise.fieldMeta?.[exercise.editableFields[0]]?.deviceId ?? exercise.devices[0]?.id ?? null,
   };
+
+  if (savedAttempt?.version === 1 && savedAttempt.seed === state.seed) {
+    for (const field of exercise.editableFields) {
+      if (typeof savedAttempt.submission?.[field] === 'string') state.submission[field] = savedAttempt.submission[field].slice(0, 128);
+    }
+    state.hintLevel = Number.isInteger(savedAttempt.hintLevel) ? Math.max(0, Math.min(3, savedAttempt.hintLevel)) : 0;
+    state.attempts = Number.isInteger(savedAttempt.attempts) ? Math.max(0, Math.min(100000, savedAttempt.attempts)) : 0;
+    if (exercise.devices.some((device) => device.id === savedAttempt.selectedDeviceId)) state.selectedDeviceId = savedAttempt.selectedDeviceId;
+    if (savedAttempt.checked === true) {
+      state.validation = validateSubmission(exercise, state.submission);
+      state.phase = state.validation.ok ? 'correct' : 'incorrect';
+      if (state.validation.ok) recordedSeed = state.seed;
+    }
+  }
+
+  function persist() {
+    onSave({ version: 1, seed: state.seed, submission: { ...state.submission }, hintLevel: state.hintLevel,
+      attempts: state.attempts, selectedDeviceId: state.selectedDeviceId, checked: Boolean(state.validation) });
+  }
+
+  function updateField(field, value) {
+    state.submission[field] = value;
+    const hadValidation = Boolean(state.validation);
+    state.validation = null;
+    state.phase = 'ready';
+    persist();
+    if (hadValidation) render();
+  }
+
+  function focusField(field) {
+    const deviceId = exercise.fieldMeta?.[field]?.deviceId;
+    if (deviceId) state.selectedDeviceId = deviceId;
+    render();
+    [...root.querySelectorAll('input')].find((input) => input.name === field)?.focus();
+    persist();
+  }
 
   function check() {
     state.attempts += 1;
@@ -133,11 +177,13 @@ export function renderWorkshop({
         seed: state.seed,
       });
     }
+    persist();
     render();
   }
 
   function revealHint() {
     state.hintLevel = Math.min(3, state.hintLevel + 1);
+    persist();
     render();
   }
 
@@ -148,22 +194,14 @@ export function renderWorkshop({
 
   function newExercise() {
     variation += 1;
-    exercise = makeExercise(definition, `${seed}-next-${variation}`);
-    state.phase = 'ready';
-    state.hintLevel = 0;
-    state.attempts = 0;
-    state.seed = exercise.seed;
-    state.submission = { ...exercise.initial };
-    state.validation = null;
-    state.selectedDeviceId = exercise.devices[0]?.id ?? null;
-    render();
-    root.querySelector('input')?.focus({ preventScroll: true });
+    const newSeed = `${definition.id}-${Date.now().toString(36)}-${variation}`;
+    onNavigate(`/workshops/${definition.id}?seed=${encodeURIComponent(newSeed)}`);
   }
 
   function renderFields() {
     const fields = element('div', { className: 'workshop-fields' });
     exercise.editableFields
-      .filter((field) => !exercise.fieldMeta?.[field]?.deviceId)
+      .filter((field) => simple || !exercise.fieldMeta?.[field]?.deviceId)
       .forEach((field, index) => {
         const labelKey = fieldLabelKey(field, exercise.fieldMeta?.[field]);
         const inputId = `workshop-field-${index}`;
@@ -177,13 +215,15 @@ export function renderWorkshop({
           'aria-describedby': `${inputId}-note`,
           'data-focus-key': `field:${field}`,
           onInput: (event) => {
-            state.submission[field] = event.currentTarget.value;
+            const value = event.currentTarget.value;
+            updateField(field, value);
+            root.querySelector(`#${inputId}-note`).textContent = i18n.t(value.trim() ? 'workspace.filled' : 'workspace.editable');
           },
         });
         fields.append(element('div', { className: 'workshop-field' }, [
           element('label', { for: inputId }, [i18n.t(labelKey)]),
           input,
-          element('small', { id: `${inputId}-note` }, [i18n.t('workshop.editable')]),
+          element('small', { id: `${inputId}-note` }, [i18n.t(state.submission[field]?.trim() ? 'workspace.filled' : 'workspace.editable')]),
         ]));
       });
     return fields.childElementCount > 0 ? fields : null;
@@ -204,25 +244,29 @@ export function renderWorkshop({
       element('div', {}, [
         element('p', { className: 'eyebrow' }, [i18n.t(`course.${definition.stageId}.eyebrow`)]),
         element('h1', { id: 'workshop-title' }, [lessonContent.title]),
+        element('details', { className: 'lesson-details', open: lessonOpen, onToggle: (event) => { lessonOpen = event.currentTarget.open; } }, [
+        element('summary', {}, [i18n.t('workspace.lesson')]),
         element('p', { className: 'workshop-intro', 'data-micro-lesson': '' }, [lessonContent.microLesson]),
         element('p', { className: 'note-label' }, [i18n.t('course.method')]),
         element('ol', { className: 'workshop-method' }, lessonContent.methodSteps.map((step) =>
           element('li', {}, [step]))),
         element('p', { className: 'workshop-readiness' }, [lessonContent.readinessLabel]),
+        ]),
       ]),
       element('aside', { className: 'exercise-note' }, [
-        element('span', {}, [i18n.t('course.practice')]),
-        element('strong', {}, [i18n.t('workshop.clue', { value: exerciseClue(exercise) })]),
-        element('small', {}, [i18n.t('workshop.seed', { seed: state.seed })]),
+        element('span', {}, [i18n.t('workspace.given')]),
+        element('strong', {}, [exerciseClue(exercise)]),
+
       ]),
     ]);
-    topologyController = createTopology({
+    topologyController = simple ? null : createTopology({
       i18n,
       devices: exercise.devices,
       links: exercise.links,
       selectedDeviceId: state.selectedDeviceId,
       onSelect: (deviceId) => {
         state.selectedDeviceId = deviceId;
+        persist();
         render();
       },
     });
@@ -238,18 +282,22 @@ export function renderWorkshop({
         element('p', { className: 'note-label' }, [i18n.t('course.objective')]),
         element('h2', {}, [lessonContent.objective]),
       ]),
-      topologyController.element,
-      renderDeviceConfig({
+      !simple && renderExerciseGoals(i18n, exercise),
+      element('div', { className: `exercise-workspace${simple ? ' is-simple' : ''}` }, [
+      topologyController?.element,
+      element('div', { className: 'exercise-editor' }, [
+      !simple && renderDeviceConfig({
         i18n,
         device: selectedDevice,
         devices: exercise.devices,
         links: exercise.links,
         submission: state.submission,
-        onChange: (field, value) => {
-          state.submission[field] = value;
-        },
+        onChange: updateField,
+        onSelect: (deviceId) => { state.selectedDeviceId = deviceId; persist(); render(); },
       }),
       renderFields(),
+      ]),
+      ]),
       element('div', { className: 'workshop-actions' }, [
         ...(state.phase === 'correct'
           ? [
@@ -272,7 +320,7 @@ export function renderWorkshop({
               className: 'button button-primary',
               type: 'submit',
               'data-focus-key': 'action:check',
-            }, [i18n.t('action.check')]),
+            }, [i18n.t(syntaxOnly ? 'workspace.checkAddress' : 'action.check')]),
             state.hintLevel < 3 && element('button', {
               className: 'button button-secondary',
               type: 'button',
@@ -295,15 +343,27 @@ export function renderWorkshop({
       ]),
     ]);
     const feedback = element('div', { className: 'workshop-feedback' }, [
-      state.validation && !state.validation.ok && renderDiagnostic(i18n, state.validation),
+      state.validation && !state.validation.ok && renderDiagnostic(i18n, state.validation, { exercise, submission: state.submission, onFocusField: focusField, headingKey: syntaxOnly ? 'workspace.invalidAddress' : 'feedback.incorrect' }),
       renderHint(i18n, state.hintLevel, hint),
       state.phase === 'correct' && element('div', { className: 'feedback feedback-success', role: 'status' }, [
-        element('strong', {}, [i18n.t('feedback.correct')]),
+        element('strong', {}, [i18n.t(syntaxOnly ? 'workspace.validAddress' : 'feedback.correct')]),
         element('p', {}, [i18n.t('result.saved')]),
       ]),
     ]);
 
-    replace(root, [lesson, form, feedback, state.phase === 'correction' && renderCorrection(i18n, exercise)]);
+    form.querySelector('.exercise-editor').append(form.querySelector('.workshop-actions'), feedback);
+    const navigation = element('nav', { className: 'workshop-pager', 'aria-label': i18n.t('workspace.pager') }, [
+      previousTarget && element('a', { href: `#${previousTarget.route}`, onClick: (event) => { event.preventDefault(); onNavigate(previousTarget.route); } }, [`← ${i18n.t('workspace.previous')}`]),
+      nextTarget && element('a', { href: `#${nextTarget.route}`, onClick: (event) => { event.preventDefault(); onNavigate(nextTarget.route); } }, [i18n.t(nextTarget.labelKey) + ' →']),
+    ]);
+    const permalink = new URL(globalThis.location.href);
+    permalink.hash = `/workshops/${definition.id}?seed=${encodeURIComponent(state.seed)}`;
+    const details = element('details', { className: 'exercise-details', open: detailsOpen, onToggle: (event) => { detailsOpen = event.currentTarget.open; } }, [
+      element('summary', {}, [i18n.t('workspace.details')]),
+      element('a', { href: permalink.href }, [i18n.t('workspace.link')]),
+      element('small', {}, [i18n.t('workshop.seed', { seed: state.seed })]),
+    ]);
+    replace(root, [lesson, form, state.phase === 'correction' && renderCorrection(i18n, exercise), navigation, details]);
     restoreFocus(root, focusSnapshot);
   }
 

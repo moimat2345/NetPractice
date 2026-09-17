@@ -92,7 +92,7 @@ test('restores saved progress in the shell', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByRole('banner').getByText('2 / 6')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('6 / 19')).toBeVisible();
 });
 
 test('keeps a partial stage in progress and resumes its first unfinished workshop', async ({ page }) => {
@@ -107,7 +107,7 @@ test('keeps a partial stage in progress and resumes its first unfinished worksho
 
   await page.goto('/');
 
-  await expect(page.getByRole('banner').getByText('1 / 6')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('3 / 19')).toBeVisible();
   const subnetStage = page.locator('.ledger-row').filter({ hasText: 'Masks and networks' });
   await expect(subnetStage).not.toHaveClass(/is-complete/);
   await expect(subnetStage).toContainText('In progress');
@@ -129,7 +129,7 @@ test('offers the mock exam after all nineteen workshops are complete', async ({ 
 
   await page.goto('/');
 
-  await expect(page.getByRole('banner').getByText('6 / 6')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('19 / 19')).toBeVisible();
   await expect(page.locator('.button-primary')).toHaveText('Start mock exam');
   await expect(page.locator('.button-primary')).toHaveAttribute('href', /^#\/exam\?seed=/);
   await expect(page.locator('[data-workshop-link]')).toHaveCount(19);

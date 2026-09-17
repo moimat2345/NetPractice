@@ -1,6 +1,8 @@
 import { element, replace } from './dom.js';
+import { lessonsFr } from '../content/lessons.fr.js';
+import { lessonsEn } from '../content/lessons.en.js';
 import {
-  completedSectionCount,
+  completedWorkshopCount,
   nextWorkshopInSection,
   sectionCompleted,
   sectionStarted,
@@ -8,6 +10,8 @@ import {
 
 export function createShell({ i18n, progress, sections = [], onNavigate = () => {} }) {
   let activeStageId = null;
+  let activeWorkshopId = null;
+  const totalWorkshops = sections.flatMap((section) => section.workshops).length;
   const skipLink = document.querySelector('.skip-link');
   const frame = element('div', { className: 'app-frame', 'data-view': 'home' });
   const wordmark = element('a', {
@@ -22,8 +26,8 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
   const progressValue = element('strong', { className: 'progress-value' });
   const progressMeter = element('progress', {
     className: 'progress-meter',
-    max: sections.length,
-    value: completedSectionCount(sections, progress),
+    max: totalWorkshops,
+    value: completedWorkshopCount(sections, progress),
   });
   const progressBlock = element('div', { className: 'header-progress' }, [
     element('span', { className: 'status-mark', 'aria-hidden': 'true' }),
@@ -48,6 +52,7 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
     element('div', { className: 'header-inner' }, [wordmark, progressBlock, languageGroup]),
   ]);
   const navigation = element('nav', { className: 'curriculum-nav' });
+  const mobileNavigation = element('details', { className: 'mobile-curriculum' });
   const sidebar = element('aside', { className: 'curriculum-sidebar' }, [navigation]);
   const outlet = element('main', { className: 'route-outlet', id: 'main-content', tabindex: '-1' });
   const focusOutlet = (event) => {
@@ -62,7 +67,7 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
     element('div', { className: 'footer-inner' }, [footerNote, footerDescription]),
   ]);
 
-  frame.append(banner, element('div', { className: 'app-body' }, [sidebar, outlet]), footer);
+  frame.append(banner, element('div', { className: 'app-body' }, [sidebar, element('div', { className: 'content-column' }, [mobileNavigation, outlet])]), footer);
 
   function renderNavigation() {
     navigation.setAttribute('aria-label', i18n.t('nav.curriculum'));
@@ -92,27 +97,42 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
         element('span', { className: 'curriculum-index', 'aria-hidden': 'true' }, [String(index + 1).padStart(2, '0')]),
         element('span', { className: 'curriculum-copy' }, [
           element('strong', {}, [i18n.t(section.titleKey)]),
-          element('small', {}, [i18n.t(stateKey)]),
+          element('small', {}, [i18n.t(stateKey) + ' · ' + i18n.t('workspace.chapterProgress', { completed: completedWorkshopCount([section], progress), total: section.workshops.length })]),
         ]),
         element('span', { className: 'curriculum-state', 'aria-hidden': 'true' }, [complete ? '✓' : current ? '→' : '·']),
       ]);
-      list.append(element('li', {}, [link]));
+      list.append(element('li', {}, [link, current && workshopList(section)]));
     });
 
     replace(navigation, [heading, list]);
+    replace(mobileNavigation, [element('summary', {}, [i18n.t('workspace.menu')]),
+      element('nav', { 'aria-label': i18n.t('workspace.menu') }, sections.map((section) =>
+        element('section', {}, [element('p', { className: 'note-label' }, [i18n.t(section.titleKey)]), workshopList(section)]))),
+    ]);
+  }
+
+  function workshopList(section) {
+    const lessons = i18n.locale === 'fr' ? lessonsFr : lessonsEn;
+    return element('ol', { className: 'curriculum-workshops' }, section.workshops.map((id) => element('li', {}, [
+      element('a', { href: `#/workshops/${id}`, 'data-curriculum-workshop': id, 'aria-current': activeWorkshopId === id ? 'page' : null,
+        onClick: (event) => { event.preventDefault(); mobileNavigation.open = false; onNavigate(`/workshops/${id}`); } }, [
+        lessons[id].title, progress.completed?.[id] && element('span', { 'aria-label': i18n.t('course.completed') }, [' ✓']),
+      ]),
+    ])));
+
   }
 
   function renderChrome() {
-    const complete = completedSectionCount(sections, progress);
+    const complete = completedWorkshopCount(sections, progress);
     document.documentElement.lang = i18n.locale;
     wordmark.textContent = i18n.t('app.name');
     wordmark.setAttribute('aria-label', i18n.t('home.backHome'));
     progressLabel.textContent = i18n.t('nav.progress');
-    progressValue.textContent = `${complete} / ${sections.length}`;
+    progressValue.textContent = `${complete} / ${totalWorkshops}`;
     progressMeter.value = complete;
-    progressMeter.setAttribute('aria-label', i18n.t('progress.summary', {
+    progressMeter.setAttribute('aria-label', i18n.t('workspace.progress', {
       completed: complete,
-      total: sections.length,
+      total: totalWorkshops,
     }));
     languageGroup.setAttribute('aria-label', i18n.t('accessibility.languageToggle'));
     frenchButton.textContent = i18n.t('nav.french');
@@ -139,9 +159,10 @@ export function createShell({ i18n, progress, sections = [], onNavigate = () => 
     element: frame,
     outlet,
     renderNavigation,
-    setActiveStage(stageId) {
+    setActiveStage(stageId, workshopId = null) {
       const nextStageId = sections.some((section) => section.id === stageId) ? stageId : null;
-      if (activeStageId === nextStageId) return;
+      if (activeStageId === nextStageId && activeWorkshopId === workshopId) return;
+      activeWorkshopId = workshopId;
       activeStageId = nextStageId;
       renderNavigation();
     },

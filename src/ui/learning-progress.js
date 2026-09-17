@@ -30,3 +30,7 @@ export function nextWorkshopId(sections, progress) {
   }
   return null;
 }
+
+export function completedWorkshopCount(sections, progress) {
+  return sections.flatMap((section) => section.workshops).filter((id) => workshopCompleted(progress, id)).length;
+}

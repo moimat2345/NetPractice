@@ -6,7 +6,7 @@ function deviceForInterface(devices, interfaceId) {
   return devices.find((device) => device.interfaces.some((entry) => entry.id === interfaceId));
 }
 
-function packetFlowOrder(devices, links) {
+function deviceNeighbors(devices, links) {
   const neighbors = new Map(devices.map((device) => [device.id, []]));
   links.forEach((link) => {
     const first = deviceForInterface(devices, link.a);
@@ -15,6 +15,11 @@ function packetFlowOrder(devices, links) {
     neighbors.get(first.id).push(second);
     neighbors.get(second.id).push(first);
   });
+  return neighbors;
+}
+
+function packetFlowOrder(devices, links) {
+  const neighbors = deviceNeighbors(devices, links);
   const ordered = [];
   const visited = new Set();
   const visit = (device) => {
@@ -28,6 +33,53 @@ function packetFlowOrder(devices, links) {
   visit(devices.find((device) => device.kind === 'internet') ?? devices[0]);
   devices.forEach(visit);
   return ordered;
+}
+
+// Give each graph depth its own row. Real card heights determine row spacing,
+// so translated labels and diagnostic badges cannot collide with the next row.
+export function layoutTopology(devices, links, width, sizes = new Map()) {
+  const neighbors = deviceNeighbors(devices, links);
+  const rows = [];
+  const visited = new Set();
+  const ordered = packetFlowOrder(devices, links);
+  for (const root of ordered) {
+    if (visited.has(root.id)) continue;
+    visited.add(root.id);
+    const queue = [{ device: root, depth: 0 }];
+    for (const { device, depth } of queue) {
+      (rows[depth] ??= []).push(device);
+      for (const neighbor of neighbors.get(device.id)) {
+        if (visited.has(neighbor.id)) continue;
+        visited.add(neighbor.id);
+        queue.push({ device: neighbor, depth: depth + 1 });
+      }
+    }
+  }
+  const order = new Map(ordered.map((device, index) => [device.id, index]));
+  rows.forEach((row) => row.sort((a, b) => order.get(a.id) - order.get(b.id)));
+  const padding = 16;
+  const gap = 24;
+  const rowGap = 24;
+  const columns = Math.max(1, ...rows.map((row) => row.length));
+  const nodeWidth = Math.min(136, (width - 2 * padding - (columns - 1) * gap) / columns);
+  const positions = new Map();
+  if (width < 480 || nodeWidth < 100) return { mode: 'stacked', positions, height: 0 };
+  let y = padding;
+  rows.forEach((row) => {
+    const rowHeight = Math.max(...row.map((device) => sizes.get(device.id)?.height ?? 64));
+    const rowWidth = row.length * nodeWidth + (row.length - 1) * gap;
+    row.forEach((device, index) => {
+      const height = sizes.get(device.id)?.height ?? 64;
+      positions.set(device.id, {
+        x: (width - rowWidth) / 2 + index * (nodeWidth + gap),
+        y: y + (rowHeight - height) / 2,
+        width: nodeWidth,
+        height,
+      });
+    });
+    y += rowHeight + rowGap;
+  });
+  return { mode: 'diagram', positions, height: y - rowGap + padding };
 }
 
 export function nearestEdgePoints(a, b, canvas) {
@@ -55,7 +107,6 @@ export function createTopology({
   deviceStatuses = {},
   onSelect = () => {},
 }) {
-  const mobileQuery = globalThis.matchMedia?.('(max-width: 599px)');
   const canvas = element('section', {
     className: 'topology-canvas',
     'data-topology': '',
@@ -72,14 +123,7 @@ export function createTopology({
   });
   const nodes = new Map();
   const paths = [];
-
-  function isMobile() {
-    return mobileQuery?.matches ?? globalThis.innerWidth < 600;
-  }
-
-  function applyMode() {
-    canvas.dataset.topologyMode = isMobile() ? 'stacked' : 'diagram';
-  }
+  const neighbors = deviceNeighbors(devices, links);
 
   packetFlowOrder(devices, links).forEach((device) => {
     const label = i18n.t(device.labelKey);
@@ -97,7 +141,7 @@ export function createTopology({
         ? i18n.t('action.selectDeviceStatus', { deviceId: label, status: statusLabel })
         : i18n.t('action.selectDevice', { deviceId: label }),
       'aria-pressed': String(device.id === selectedDeviceId),
-      style: `--device-x:${device.position.x}%;--device-y:${device.position.y}%;`,
+      'aria-describedby': neighbors.get(device.id).length ? `topology-${device.id}-neighbors` : null,
       onClick: () => onSelect(device.id),
     }, [
       element('span', { className: 'topology-device-kind' }, [i18n.t(`device.${device.kind}`)]),
@@ -106,6 +150,13 @@ export function createTopology({
         ? i18n.t('topology.segment')
         : i18n.t('topology.interfaceCount', { count: device.interfaces.length })]),
       status && element('span', { className: 'topology-device-status', 'aria-hidden': 'true' }, [statusLabel]),
+      neighbors.get(device.id).length > 0 && element('span', {
+        className: 'topology-neighbors', id: `topology-${device.id}-neighbors`,
+      }, [
+        element('span', { className: 'topology-neighbors-label' }, [i18n.t('topology.connectedTo')]),
+        element('span', { className: 'topology-neighbors-list' }, neighbors.get(device.id).map((neighbor) =>
+          element('span', { className: 'topology-neighbor', 'data-neighbor-id': neighbor.id }, [i18n.t(neighbor.labelKey)]))),
+      ]),
     ]);
     nodes.set(device.id, node);
     deviceLayer.append(node);
@@ -129,7 +180,24 @@ export function createTopology({
   let destroyed = false;
   function updateLinks() {
     frame = null;
-    if (destroyed || isMobile() || !canvas.isConnected) return;
+    if (destroyed || !canvas.isConnected) return;
+    const width = canvas.clientWidth;
+    let layout = layoutTopology(devices, links, width);
+    canvas.dataset.topologyMode = layout.mode;
+    if (layout.mode === 'stacked') {
+      canvas.style.removeProperty('height');
+      return;
+    }
+    for (const [id, position] of layout.positions) {
+      nodes.get(id).style.setProperty('--device-width', `${position.width}px`);
+    }
+    const sizes = new Map([...nodes].map(([id, node]) => [id, { height: node.getBoundingClientRect().height }]));
+    layout = layoutTopology(devices, links, width, sizes);
+    canvas.style.height = `${layout.height + 2}px`;
+    for (const [id, position] of layout.positions) {
+      nodes.get(id).style.setProperty('--device-x', `${position.x}px`);
+      nodes.get(id).style.setProperty('--device-y', `${position.y}px`);
+    }
     const svgRect = svg.getBoundingClientRect();
     svg.setAttribute('viewBox', `0 0 ${svgRect.width} ${svgRect.height}`);
     for (const { path, sourceId, targetId } of paths) {
@@ -152,15 +220,9 @@ export function createTopology({
     frame = requestAnimationFrame(updateLinks);
   }
 
-  function handleModeChange() {
-    applyMode();
-    scheduleLinks();
-  }
-
-  applyMode();
   const observer = new ResizeObserver(scheduleLinks);
   observer.observe(canvas);
-  mobileQuery?.addEventListener?.('change', handleModeChange);
+  nodes.forEach((node) => observer.observe(node));
   globalThis.addEventListener('resize', scheduleLinks);
   document.fonts?.ready.then(scheduleLinks);
   scheduleLinks();
@@ -171,7 +233,6 @@ export function createTopology({
     destroy() {
       destroyed = true;
       observer.disconnect();
-      mobileQuery?.removeEventListener?.('change', handleModeChange);
       globalThis.removeEventListener('resize', scheduleLinks);
       if (frame !== null) cancelAnimationFrame(frame);
     },

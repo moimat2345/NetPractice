@@ -1,4 +1,9 @@
+import { practiceEn } from './practice.js';
+import { workspaceEn } from './workspace.js';
+
 export const en = {
+  practice: practiceEn,
+  workspace: workspaceEn,
   app: {
     name: 'Subnet Notes',
     documentTitle: 'Subnet Notes — Learn IPv4 and routing by doing',
@@ -124,6 +129,7 @@ export const en = {
     noSelection: 'Select a device to inspect its configuration.',
   },
   topology: {
+    connectedTo: 'Connected to',
     interfaces: 'Interfaces',
     routes: 'Ordered routes',
     segment: 'LAN segment',
@@ -298,6 +304,8 @@ export const en = {
     return: 'Finally trace the return from {returnSource} to {returnDestination} the same way; a successful outbound path is not enough.',
   },
   exam: {
+    resumed: 'Session resumed: the timer continues from your original start.',
+    restart: 'Start a new mock exam',
     title: 'Mock evaluation',
     intro: 'Three original missions, fifteen minutes, no hints.',
     objective: 'Restore every required communication in this mission.',

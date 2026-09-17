@@ -28,7 +28,7 @@ test('keeps workshop progress and language after reload', async ({ page }) => {
   await page.reload();
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.getByRole('banner').getByText('0 / 6')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('1 / 19')).toBeVisible();
   await expect.poll(async () => page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('subnet-notes-progress'));
     return {
@@ -46,7 +46,7 @@ test('exposes meaningful names for the page landmarks and controls', async ({ pa
   await expect(page.getByRole('contentinfo')).toBeVisible();
   await expect(page.getByRole('navigation', { name: /parcours|learning path/i }).first()).toBeVisible();
   await expect(page.getByRole('group', { name: /langue|language/i })).toBeVisible();
-  await expect(page.getByRole('progressbar', { name: /étapes|stages/i })).toBeVisible();
+  await expect(page.getByRole('progressbar', { name: /ateliers|workshops/i })).toBeVisible();
   await expect(page.getByRole('link', { name: /accueil|home/i }).first()).toBeVisible();
 
   const visibleNavigationNames = await page.locator('nav').evaluateAll((landmarks) => landmarks

@@ -4,7 +4,8 @@ import { renderHome } from './ui/home.js';
 import { createShell } from './ui/shell.js';
 import { renderExam } from './ui/exam.js';
 import { renderWorkshop } from './ui/workshop.js';
-import { completedSectionCount } from './ui/learning-progress.js';
+import { completedWorkshopCount } from './ui/learning-progress.js';
+import { createAttemptStore } from './storage/attempts.js';
 
 const LEARNING_PATH = curriculum.map((stage) => ({
   id: stage.id,
@@ -55,6 +56,11 @@ export function createApp(root, dependencies) {
 
   const { i18n, storage } = dependencies;
   let progress = dependencies.progress;
+  const attempts = createAttemptStore(storage);
+  const workshopSeeds = Object.fromEntries(WORKSHOP_ORDER.flatMap((id) => {
+    const seed = progress.current?.workshops?.[id];
+    return typeof seed === 'string' && seed.length <= 256 ? [[id, seed]] : [];
+  }));
   let currentRoute = routeFromHash();
   let workshopController = null;
   let activeWorkshopKey = null;
@@ -77,15 +83,15 @@ export function createApp(root, dependencies) {
   root.replaceChildren(shell.element);
 
   function refreshShellProgress() {
-    const complete = completedSectionCount(LEARNING_PATH, progress);
+    const complete = completedWorkshopCount(LEARNING_PATH, progress);
     const value = shell.element.querySelector('.progress-value');
     const meter = shell.element.querySelector('.progress-meter');
-    if (value) value.textContent = `${complete} / ${LEARNING_PATH.length}`;
+    if (value) value.textContent = `${complete} / ${WORKSHOP_ORDER.length}`;
     if (meter) {
       meter.value = complete;
-      meter.setAttribute('aria-label', i18n.t('progress.summary', {
+      meter.setAttribute('aria-label', i18n.t('workspace.progress', {
         completed: complete,
-        total: LEARNING_PATH.length,
+        total: WORKSHOP_ORDER.length,
       }));
     }
     shell.renderNavigation();
@@ -125,13 +131,17 @@ export function createApp(root, dependencies) {
     const requestedWorkshop = workshopRoute(currentRoute);
     const definition = requestedWorkshop ? getWorkshopDefinition(requestedWorkshop.id) : null;
     shell.setView(definition || requestedExam ? 'workshop' : 'home');
-    shell.setActiveStage(definition?.stageId ?? (requestedExam ? 'exam' : null));
+    shell.setActiveStage(definition?.stageId ?? (requestedExam ? 'exam' : null), definition?.id ?? null);
 
     if (requestedExam) {
       closeWorkshop();
       if (examController && activeExamKey === requestedExam.seed) return;
       closeExam();
-      examController = renderExam({ i18n, seed: requestedExam.seed, onFinalize: recordExamResult });
+      const attemptKey = `exam:${requestedExam.seed}`;
+      progress = { ...progress, current: { kind: 'exam', seed: requestedExam.seed, workshops: workshopSeeds } };
+      saveProgress(storage, progress);
+      examController = renderExam({ i18n, seed: requestedExam.seed, onFinalize: recordExamResult,
+        savedAttempt: attempts.get(attemptKey), onSave: (snapshot) => attempts.set(attemptKey, snapshot), onNavigate: navigate });
       activeExamKey = requestedExam.seed;
       shell.outlet.replaceChildren(examController.element);
       return;
@@ -139,11 +149,16 @@ export function createApp(root, dependencies) {
 
     if (definition) {
       closeExam();
-      const effectiveSeed = requestedWorkshop.seed || `${definition.id}-practice`;
+      const effectiveSeed = requestedWorkshop.seed || workshopSeeds[definition.id] || `${definition.id}-practice`;
       const workshopKey = `${definition.id}\u0000${effectiveSeed}`;
       if (workshopController && activeWorkshopKey === workshopKey) return;
       closeWorkshop();
       const nextTarget = nextWorkshopTarget(definition.id);
+      const previousId = WORKSHOP_ORDER[WORKSHOP_ORDER.indexOf(definition.id) - 1];
+      const attemptKey = `workshop:${definition.id}:${effectiveSeed}`;
+      workshopSeeds[definition.id] = effectiveSeed;
+      progress = { ...progress, current: { kind: 'workshop', id: definition.id, seed: effectiveSeed, workshops: workshopSeeds } };
+      saveProgress(storage, progress);
       workshopController = renderWorkshop({
         i18n,
         definition,
@@ -151,6 +166,9 @@ export function createApp(root, dependencies) {
         onComplete: recordCompletion,
         onNavigate: navigate,
         nextTarget,
+        previousTarget: previousId ? { route: `/workshops/${previousId}` } : null,
+        savedAttempt: attempts.get(attemptKey),
+        onSave: (snapshot) => attempts.set(attemptKey, snapshot),
       });
       activeWorkshopKey = workshopKey;
       shell.outlet.replaceChildren(workshopController.element);

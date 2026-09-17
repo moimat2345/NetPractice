@@ -1,5 +1,6 @@
 import { formatIPv4 } from '../core/ipv4.js';
 import { element } from './dom.js';
+import { entryLabel } from './exercise-labels.js';
 
 function fieldId(deviceId, section, entryId, property) {
   return `${deviceId}.${section}.${entryId}.${property}`;
@@ -35,7 +36,14 @@ function configField({ i18n, device, section, entry, property, submission, missi
       'data-focus-key': `field:${id}`,
       'aria-describedby': `${inputId}-note`,
       'aria-invalid': missing ? 'true' : null,
-      onInput: (event) => onChange(id, event.currentTarget.value),
+      inputmode: property === 'prefix' ? 'numeric' : 'decimal',
+      onInput: (event) => {
+        const input = event.currentTarget;
+        const value = input.value;
+        onChange(id, value);
+        const note = document.getElementById(`${inputId}-note`);
+        if (note) note.textContent = i18n.t(value.trim() ? 'workspace.filled' : 'workspace.editable');
+      },
     })
     : element('span', { className: 'device-field-value' }, [displayedValue(property, entry[property])]);
 
@@ -43,7 +51,7 @@ function configField({ i18n, device, section, entry, property, submission, missi
     element('label', editable ? { for: inputId } : {}, [label]),
     control,
     editable && element('small', { id: `${inputId}-note` }, [
-      i18n.t(missing ? 'exam.missingInformation' : 'workshop.editable'),
+      i18n.t(missing ? 'exam.missingInformation' : submission[id]?.trim() ? 'workspace.filled' : 'workspace.editable'),
     ]),
   ]);
 }
@@ -81,6 +89,7 @@ export function renderDeviceConfig({
   submission,
   missingFields = new Set(),
   onChange = () => {},
+  onSelect = null,
 }) {
   if (!device) {
     return element('p', { className: 'device-config-empty' }, [i18n.t('workshop.noSelection')]);
@@ -93,6 +102,11 @@ export function renderDeviceConfig({
     'data-device-config': device.id,
     'aria-labelledby': titleId,
   }, [
+    onSelect && element('label', { className: 'device-picker' }, [
+      element('span', {}, [i18n.t('workspace.devicePicker')]),
+      element('select', { 'data-focus-key': 'device-picker', onChange: (event) => onSelect(event.currentTarget.value) },
+        devices.map((candidate) => element('option', { value: candidate.id, selected: candidate.id === device.id }, [i18n.t(candidate.labelKey)]))),
+    ]),
     element('header', { className: 'device-config-heading' }, [
       element('div', {}, [
         element('p', { className: 'note-label' }, [i18n.t(`device.${device.kind}`)]),
@@ -100,7 +114,6 @@ export function renderDeviceConfig({
           deviceId: i18n.t(device.labelKey),
         })]),
       ]),
-      element('span', { className: 'device-id' }, [device.id]),
       deviceHasMissing && element('span', { className: 'device-config-status' }, [i18n.t('exam.missingInformation')]),
     ]),
   ]);
@@ -115,7 +128,7 @@ export function renderDeviceConfig({
     groups.append(element('section', { className: 'device-config-group' }, [
       element('h4', {}, [i18n.t('topology.interfaces')]),
       ...device.interfaces.map((entry, index) => element('article', { className: 'config-entry' }, [
-        element('p', { className: 'config-entry-id' }, [entry.id]),
+        element('p', { className: 'config-entry-id' }, [entryLabel(i18n, device, 'interfaces', entry, index, devices, links)]),
         element('div', { className: 'config-entry-fields' }, [
           configField({ i18n, device, section: 'interfaces', entry, property: 'address', submission, missingFields, onChange, index }),
           configField({ i18n, device, section: 'interfaces', entry, property: 'prefix', submission, missingFields, onChange, index }),
@@ -128,8 +141,7 @@ export function renderDeviceConfig({
       element('h4', {}, [i18n.t('topology.routes')]),
       ...device.routes.map((entry, index) => element('article', { className: 'config-entry' }, [
         element('p', { className: 'config-entry-id' }, [
-          element('span', {}, [String(index + 1).padStart(2, '0')]),
-          entry.id,
+          entryLabel(i18n, device, 'routes', entry, index, devices, links),
         ]),
         element('div', { className: 'config-entry-fields route-fields' }, [
           configField({ i18n, device, section: 'routes', entry, property: 'destination', submission, missingFields, onChange, index }),

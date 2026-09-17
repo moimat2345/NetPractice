@@ -1,6 +1,8 @@
 import './styles/base.css';
 import './styles/layout.css';
 import './styles/components.css';
+import './styles/topology.css';
+import './styles/workspace.css';
 import { createApp } from './app.js';
 import { createI18n } from './i18n/index.js';
 import { getBrowserStorage, loadProgress } from './storage/progress.js';
